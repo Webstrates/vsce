@@ -24,7 +24,18 @@
         "command": "extension.setWebstratesHostAddress",
         "title": "Set Webstrate Server Host Address"
       }
-    ]
+    ],
+    "keybindings": [
+      {
+        "command": "extension.openWebstrate",
+        "key": "ctrl+o",
+        "mac": "cmd+o"
+      }
+    ],
+    "languages": [{
+        "id": "html",
+        "firstLine": "<html>.*"
+    }]
   },
   "scripts": {
     "vscode:prepublish": "node ./node_modules/vscode/bin/compile",

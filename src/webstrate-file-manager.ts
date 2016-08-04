@@ -24,7 +24,7 @@ class WebstrateFileManager {
    * 
    */
   requestWebstrate(webstrateId: String, workspacePath: String) {
-    const filePath = path.join(workspacePath, `${webstrateId}.html`);
+    const filePath = path.join(workspacePath, `${webstrateId}`);
 
     WebstrateFileManager.Log(`Requesting webstrate '${webstrateId}' to ${filePath}`);
 

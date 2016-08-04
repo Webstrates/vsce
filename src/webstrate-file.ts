@@ -109,7 +109,7 @@ class WebstrateFile {
 
         vscode.window.showTextDocument(doc).then(editor => {
           // editor.setDecorations()
-          // doc.languageId
+          WebstrateFileManager.Log(`language id ${doc.languageId}`);
         });
       });
     });

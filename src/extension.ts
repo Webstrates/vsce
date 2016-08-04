@@ -26,11 +26,13 @@ function webstrateIdInput() {
 
 function webstrateServerHostNameInput() {
     return vscode.window.showInputBox({ prompt: 'Webstrates Server Host Address' })
-        .then(hostAddress => {
+        .then(host => {
+            hostAddress = host;
+            
             if (fileManager) {
                 fileManager.dispose();
             }
-            fileManager = new WebstrateFileManager(hostAddress);
+            fileManager = new WebstrateFileManager(host);
         });
 }
 

@@ -1,0 +1,47 @@
+{
+  "name": "webstrates",
+  "displayName": "Webstrates",
+  "description": "Webstrates File Editor",
+  "version": "0.0.1",
+  "publisher": "raedle",
+  "engines": {
+    "vscode": "^1.0.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:extension.openWebstrate"
+  ],
+  "main": "./out/src/extension",
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.openWebstrate",
+        "title": "Open Webstrate"
+      },
+      {
+        "command": "extension.setWebstratesHostAddress",
+        "title": "Set Webstrate Server Host Address"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
+    "compile": "node ./node_modules/vscode/bin/compile -watch -p ./",
+    "postinstall": "node ./node_modules/vscode/bin/install"
+  },
+  "dependencies": {
+    "websocket": "^1.0.23",
+    "json0-ot-diff": "^1.0.1",
+    "jsonml-parse": "^1.0.0",
+    "jsonml-tools": "git+http://github.com/cklokmose/jsonml-tools.git#master",
+    "optimist": "^0.6.1",
+    "sharedb": "^0.11.37",
+    "chokidar": "^1.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^1.8.5",
+    "vscode": "^0.11.0"
+  }
+}

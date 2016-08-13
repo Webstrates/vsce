@@ -65,17 +65,9 @@ class WebstrateFileManager {
   public getWebstrateFile(textDocument: vscode.TextDocument) {
 
     // find webstrate file associated with the same text document
-    let file = this.openFiles.find((file, index) => {
+    return this.openFiles.find((file, index) => {
       return file.textDocument === textDocument;
     });
-
-    console.log('textDocument');
-    console.log(textDocument);
-
-    console.log('file');
-    console.log(file);
-
-    return file;
   }
 
   /**

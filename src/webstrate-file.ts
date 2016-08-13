@@ -166,7 +166,7 @@ class WebstrateFile {
   startKeepAlive() {
     const that = this;
     this.aliveInterval = setInterval(() => {
-      console.log('alive message');
+      // console.log('alive message');
       try {
         const message = {
           type: 'alive'

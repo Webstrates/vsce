@@ -41,20 +41,14 @@ const WebstrateFileUtils = {
   loadWorkspaceConfig(rootPath) {
     const webstratesConfigFileAbsolute = path.join(rootPath, this.webstratesConfigPath, this.webstratesConfigFileName);
     let rawConfig = fs.readFileSync(webstratesConfigFileAbsolute, 'utf8');
-
-    console.log('banananana');
-    console.log(rawConfig);
-
     return JSONC.parse(rawConfig);
-
-    // return require(webstratesConfigFileAbsolute);
   },
 
   /**
    * 
    */
   checkWorkspaceConfiguration(rootPath: string) {
-    console.log('check workspace config');
+    // console.log('check workspace config');
 
     const webstratesConfigPathAbsolute = path.join(rootPath, this.webstratesConfigPath);
     let exists = fs.existsSync(webstratesConfigPathAbsolute);

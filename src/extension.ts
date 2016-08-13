@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import { WebstrateFileManager } from './webstrate-file-manager';
 import { WebstrateFile } from './webstrate-file';
 import { WebstrateFileUtils } from './webstrate-file.utils';
+import { WebstratePreviewDocumentContentProvider } from './webstrate-content-provider';
 
 let fs = require('fs');
 let path = require('path');
@@ -29,27 +30,6 @@ function webstrateIdInput() {
         });
 }
 
-function webstrateServerHostNameInput() {
-    return new Promise(() => {
-        serverAddress = 'webstrates.romanraedle.com';
-
-        if (fileManager) {
-            fileManager.dispose();
-        }
-        fileManager = new WebstrateFileManager(serverAddress);
-    });
-
-    // return vscode.window.showInputBox({ prompt: 'Webstrates Server Host Address' })
-    //     .then(host => {
-    //         hostAddress = host;
-
-    //         if (fileManager) {
-    //             fileManager.dispose();
-    //         }
-    //         fileManager = new WebstrateFileManager(host);
-    //     });
-}
-
 /**
  * Init Webstrates workspace.
  */
@@ -67,12 +47,7 @@ const openWebstrate = function () {
         return;
     }
 
-    if (!serverAddress) {
-        webstrateServerHostNameInput().then(webstrateIdInput);
-    }
-    else {
-        webstrateIdInput();
-    }
+    webstrateIdInput();
 }
 
 /**
@@ -88,7 +63,7 @@ const showWebstratePreview = function () {
     let webstrateFile = fileManager.getWebstrateFile(textDocument);
     let webstrateId = webstrateFile.webstrateId;
 
-    return vscode.commands.executeCommand('vscode.previewHtml', uri, vscode.ViewColumn.Two, `${webstrateId} Preview`).then((success) => {
+    return vscode.commands.executeCommand('vscode.previewHtml', uri, vscode.ViewColumn.Two, `Webstrate Preview`).then((success) => {
     }, (reason) => {
         vscode.window.showErrorMessage(reason);
     });
@@ -117,100 +92,15 @@ const saveWebstrate = function (textDocument) {
 const closeWebstrate = function (textDocument) {
     // vscode.window.showInformationMessage('close text doc');
     fileManager.closeWebstrate(textDocument);
-
-    console.log(textDocument);
 }
 
 const initFileManager = function () {
     const workspacePath = vscode.workspace.rootPath;
     const config = WebstrateFileUtils.loadWorkspaceConfig(workspacePath);
 
-    console.log(config);
-
     serverAddress = config.serverAddress;
-    console.log('config: ' + serverAddress);
     if (serverAddress) {
         fileManager = new WebstrateFileManager(serverAddress);
-    }
-}
-
-class WebstratePreviewDocumentContentProvider implements vscode.TextDocumentContentProvider {
-
-    /**
-     * Reset preview browser style to match Webkit default style.
-     */
-    private resetStyle: string = `
-        <style type="text/css">
-        body {
-            background: rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box;
-            color: rgb(0, 0, 0);
-
-            font-family: -webkit-standard;
-            font-weight: normal;
-            font-style: normal;
-            font-size: 16px;
-
-            margin: 8px;
-            padding: 0px;
-        }
-        </style>
-    `;
-
-    private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
-
-    public provideTextDocumentContent(uri: vscode.Uri): string {
-        return this.createCssSnippet();
-    }
-
-    get onDidChange(): vscode.Event<vscode.Uri> {
-        return this._onDidChange.event;
-    }
-
-    public update(uri: vscode.Uri) {
-        this._onDidChange.fire(uri);
-    }
-
-    private createCssSnippet() {
-        let editor = vscode.window.activeTextEditor;
-        if (!(editor.document.languageId === 'html')) {
-            return this.errorSnippet("Active editor doesn't show a HTML document - no properties to preview.")
-        }
-        return this.extractSnippet();
-    }
-
-    private extractSnippet(): string {
-        let editor = vscode.window.activeTextEditor;
-        let text = editor.document.getText();
-        return this.snippet(editor.document);
-    }
-
-    private errorSnippet(error: string): string {
-        return `
-                <body>
-                    ${error}
-                </body>`;
-    }
-
-    private snippet(document: vscode.TextDocument): string {
-        const text = document.getText();
-
-        // return text;
-
-        let $ = cheerio.load(text);
-
-        // WebstrateFileManager.Log($.html());
-
-        let $head = $('head');
-        if (!$head.length) {
-            $head = $('<head></head>');
-            $('html').prepend($head);
-        }
-
-        $head.prepend(this.resetStyle);
-
-        WebstrateFileManager.Log($head);
-
-        return $.html();
     }
 }
 
@@ -222,7 +112,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Use the console to output diagnostic information (console.log) and errors (console.error)
     // This line of code will only be executed once when your extension is activated
-    console.log('Congratulations, your extension "webstrates-file" is now active!');
+    console.log('Congratulations, your extension "webstrates-editor" is now active!');
 
     workspacePath = vscode.workspace.rootPath;
 
@@ -238,6 +128,10 @@ export function activate(context: vscode.ExtensionContext) {
         if (e.document === vscode.window.activeTextEditor.document) {
             provider.update(previewUri);
         }
+    });
+
+    vscode.window.onDidChangeActiveTextEditor((textEditor: vscode.TextEditor) => {
+        provider.update(previewUri);
     });
 
     const initWorkspaceDisposable = vscode.commands.registerCommand('webstrates.initWorkspace', initWorkspace);
@@ -258,7 +152,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 // this method is called when your extension is deactivated
 export function deactivate() {
-    console.log('deactivate');
+    console.log('Extension "webstrates-editor" deactivated.');
     if (fileManager) {
         fileManager.dispose();
     }

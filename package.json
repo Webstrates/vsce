@@ -2,7 +2,7 @@
   "name": "webstrates-editor",
   "displayName": "Webstrates Editor",
   "description": "Webstrates Editor",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "raedle",
   "engines": {
     "vscode": "^1.4.0"
@@ -27,7 +27,7 @@
       },
       {
         "command": "webstrates.showWebstratePreview",
-        "title": "Show Webstrate Preview"
+        "title": "Webstrate Preview"
       }
     ],
     "keybindings": [

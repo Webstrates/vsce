@@ -53,7 +53,7 @@ const openWebstrate = function () {
 /**
  * Shows Webstrates webstrate preview.
  */
-const showWebstratePreview = function () {
+const webstratePreview = function () {
     // let uri = vscode.window.activeTextEditor.document.uri;
     let uri = previewUri;
     WebstrateFileManager.Log('Preview Uri ' + uri);
@@ -140,8 +140,8 @@ export function activate(context: vscode.ExtensionContext) {
     const openDisposable = vscode.commands.registerCommand('webstrates.openWebstrate', openWebstrate);
     context.subscriptions.push(openDisposable);
 
-    const showWebstratePreviewDisposable = vscode.commands.registerCommand('webstrates.showWebstratePreview', showWebstratePreview);
-    context.subscriptions.push(showWebstratePreviewDisposable);
+    const webstratePreviewDisposable = vscode.commands.registerCommand('webstrates.webstratePreview', webstratePreview);
+    context.subscriptions.push(webstratePreviewDisposable);
 
     const saveDisposable = vscode.workspace.onDidSaveTextDocument(saveWebstrate);
     context.subscriptions.push(saveDisposable);

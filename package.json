@@ -26,15 +26,20 @@
         "title": "Open Webstrate"
       },
       {
-        "command": "webstrates.showWebstratePreview",
+        "command": "webstrates.webstratePreview",
         "title": "Webstrate Preview"
       }
     ],
     "keybindings": [
       {
         "command": "webstrates.openWebstrate",
-        "key": "ctrl+o",
-        "mac": "cmd+o"
+        "key": "ctrl+alt+o",
+        "mac": "cmd+alt+o"
+      },
+      {
+        "command": "webstrates.webstratePreview",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p"
       }
     ],
     "languages": [

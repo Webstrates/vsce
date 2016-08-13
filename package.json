@@ -1,41 +1,48 @@
 {
-  "name": "webstrates",
-  "displayName": "Webstrates",
-  "description": "Webstrates File Editor",
+  "name": "webstrates-editor",
+  "displayName": "Webstrates Editor",
+  "description": "Webstrates Editor",
   "version": "0.0.1",
   "publisher": "raedle",
   "engines": {
-    "vscode": "^1.0.0"
+    "vscode": "^1.4.0"
   },
   "categories": [
     "Other"
   ],
   "activationEvents": [
-    "onCommand:extension.openWebstrate"
+    "workspaceContains:.webstrates/config.json",
+    "onCommand:webstrates.initWorkspace"
   ],
   "main": "./out/src/extension",
   "contributes": {
     "commands": [
       {
-        "command": "extension.openWebstrate",
+        "command": "webstrates.initWorkspace",
+        "title": "Init Webstrates Workspace"
+      },
+      {
+        "command": "webstrates.openWebstrate",
         "title": "Open Webstrate"
       },
       {
-        "command": "extension.setWebstratesHostAddress",
-        "title": "Set Webstrate Server Host Address"
+        "command": "webstrates.showWebstratePreview",
+        "title": "Show Webstrate Preview"
       }
     ],
     "keybindings": [
       {
-        "command": "extension.openWebstrate",
+        "command": "webstrates.openWebstrate",
         "key": "ctrl+o",
         "mac": "cmd+o"
       }
     ],
-    "languages": [{
+    "languages": [
+      {
         "id": "html",
-        "firstLine": "<html>.*"
-    }]
+        "firstLine": ".*<html.*>.*"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
@@ -43,13 +50,15 @@
     "postinstall": "node ./node_modules/vscode/bin/install"
   },
   "dependencies": {
-    "websocket": "^1.0.23",
+    "chokidar": "^1.6.0",
+    "json-comments": "^0.2.1",
     "json0-ot-diff": "^1.0.1",
     "jsonml-parse": "^1.0.0",
     "jsonml-tools": "git+http://github.com/cklokmose/jsonml-tools.git#master",
+    "node-json-minify": "^1.0.0",
     "optimist": "^0.6.1",
     "sharedb": "^0.11.37",
-    "chokidar": "^1.6.0"
+    "websocket": "^1.0.23"
   },
   "devDependencies": {
     "typescript": "^1.8.5",

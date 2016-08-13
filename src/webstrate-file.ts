@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { WebstrateFileManager } from './webstrate-file-manager';
 
-var W3WebSocket = require('websocket').w3cwebsocket;
+var W3CWebSocket = require('websocket').w3cwebsocket;
 var fs = require("fs");
 var chokidar = require("chokidar");
 var sharedb = require("sharedb/lib/client");
@@ -9,14 +9,21 @@ var jsonmlParse = require("jsonml-parse");
 var jsondiff = require("json0-ot-diff");
 var jsonml = require('jsonml-tools');
 
-let websocket, remoteDocument, watcher, oldHtml;
 
 class WebstrateFile {
+
+  public websocket: any;
+  public connection: any;
+
+  private remoteDocument : any;
+  private watcher : any;
+  private oldHtml : string;
 
   public webstrateId: String;
   public textDocument: vscode.TextDocument;
   private hostAddress: String;
   private localFilePath: string;
+  private aliveInterval: any;
 
   constructor(id: String, hostAddress: String, localFilePath: string = "") {
     this.webstrateId = id;
@@ -29,26 +36,35 @@ class WebstrateFile {
   private connect() {
     let that = this;
 
-    oldHtml = "";
+    if (this.aliveInterval) {
+      clearInterval(this.aliveInterval);
+    }
+
+    this.oldHtml = "";
     WebstrateFileManager.Log("Connecting to " + this.hostAddress + "...");
-    var websocket = new W3WebSocket("wss://" + this.hostAddress + "/ws/",
+    // this.websocket = new W3CWebSocket("wss://" + this.hostAddress + "/ws/",
+    this.websocket = new W3CWebSocket(this.hostAddress + "/ws/",
       // 4 times "undefined" is the perfect amount.
       undefined, undefined, undefined, undefined, {
         maxReceivedFrameSize: 1024 * 1024 * 20 // 20 MB
       });
 
-    var conn = new sharedb.Connection(websocket);
+    this.connection = new sharedb.Connection(this.websocket);
 
-    var sdbOpenHandler = websocket.onopen;
-    websocket.onopen = function (event) {
+
+    var sdbOpenHandler = this.websocket.onopen;
+    this.websocket.onopen = function (event) {
       WebstrateFileManager.Log(`Connected to Webstrate ${that.webstrateId}.`);
       sdbOpenHandler(event);
+
+      that.stopKeepAlive();
+      that.startKeepAlive();
     };
 
     // We're sending our own events over the websocket connection that we don't want messing with
     // ShareDB, so we filter them out.
-    var sdbMessageHandler = websocket.onmessage;
-    websocket.onmessage = function (event) {
+    var sdbMessageHandler = this.websocket.onmessage;
+    this.websocket.onmessage = function (event) {
       var data = JSON.parse(event.data);
       if (data.error) {
         WebstrateFileManager.Log("Error:" + data.error.message);
@@ -59,92 +75,123 @@ class WebstrateFile {
       }
     };
 
-    var sdbCloseHandler = websocket.onclose;
-    websocket.onclose = function (event) {
+    var sdbCloseHandler = this.websocket.onclose;
+    this.websocket.onclose = function (event) {
       WebstrateFileManager.Log("Connection closed: " + event.reason);
+      that.stopKeepAlive();
+
       WebstrateFileManager.Log("Attempting to reconnect.");
+
       setTimeout(() => {
         that.connect();
       }, 1000);
       sdbCloseHandler(event);
     };
 
-    var sdbErrorHandler = websocket.onerror;
-    websocket.onerror = function (event) {
+    var sdbErrorHandler = this.websocket.onerror;
+    this.websocket.onerror = function (event) {
       WebstrateFileManager.Log("Connection error.");
+      that.stopKeepAlive();
       sdbErrorHandler(event);
     };
 
-    remoteDocument = conn.get("webstrates", that.webstrateId);
+    this.remoteDocument = this.connection.get("webstrates", that.webstrateId);
 
-    remoteDocument.on('op', (ops, source) => {
-      var newHtml = jsonToHtml(remoteDocument.data)
-      if (newHtml === oldHtml) {
+    this.remoteDocument.on('op', (ops, source) => {
+      var newHtml = jsonToHtml(that.remoteDocument.data)
+      if (newHtml === that.oldHtml) {
         return;
       }
-      that.writeDocument(jsonToHtml(remoteDocument.data));
+      that.writeDocument(jsonToHtml(that.remoteDocument.data));
     });
 
-    remoteDocument.subscribe((err) => {
+    this.remoteDocument.subscribe((err) => {
       if (err) {
         throw err;
       }
 
-      if (!remoteDocument.type) {
+      if (!this.remoteDocument.type) {
         vscode.window.showWarningMessage(`Webstrate ${that.webstrateId} doesn't exist on server, creating it.`);
-        remoteDocument.create('json0');
+        this.remoteDocument.create('json0');
         var op = [{ "p": [], "oi": ["html", {}, ["body", {}]] }];
-        remoteDocument.submitOp(op);
+        this.remoteDocument.submitOp(op);
       }
 
-      const content = jsonToHtml(remoteDocument.data);
+      const content = jsonToHtml(this.remoteDocument.data);
       that.writeDocument(content);
 
       // window.createTextEditorDecorationType({});
 
-      vscode.workspace.openTextDocument(that.localFilePath).then((doc) => {
+      vscode.workspace.openTextDocument(that.localFilePath).then(doc => {
 
         // associate text document with webstrate file
         that.textDocument = doc;
 
         vscode.window.showTextDocument(doc).then(editor => {
           // editor.setDecorations()
-          WebstrateFileManager.Log(`language id ${doc.languageId}`);
+          // WebstrateFileManager.Log(`language id ${doc.languageId}`);
         });
       });
     });
   }
 
   save() {
+    const that = this;
+
     const newHtml = this.textDocument.getText();
-    if (newHtml === oldHtml) {
+    if (newHtml === this.oldHtml) {
       return;
     }
 
-    oldHtml = newHtml;
+    this.oldHtml = newHtml;
     htmlToJson(newHtml, function (newJson) {
-      var normalizedOldJson = normalize(remoteDocument.data);
+      var normalizedOldJson = normalize(that.remoteDocument.data);
       var normalizedNewJson = normalize(newJson);
-      var ops = jsondiff(remoteDocument.data, normalizedNewJson);
+      var ops = jsondiff(that.remoteDocument.data, normalizedNewJson);
       try {
-        remoteDocument.submitOp(ops);
+        that.remoteDocument.submitOp(ops);
       } catch (e) {
         WebstrateFileManager.Log("Invalid document, rebuilding.");
         var op = [{ "p": [], "oi": ["html", {}, ["body", {}]] }];
-        remoteDocument.submitOp(op);
+        that.remoteDocument.submitOp(op);
       }
     });
   }
 
   private writeDocument(html) {
-    oldHtml = html;
+    this.oldHtml = html;
     fs.writeFileSync(this.localFilePath, html);
+  }
+
+  startKeepAlive() {
+    const that = this;
+    this.aliveInterval = setInterval(() => {
+      console.log('alive message');
+      try {
+        const message = {
+          type: 'alive'
+        }
+        that.websocket.send(JSON.stringify(message));
+      }
+      catch (err) {
+        console.error('error: ' + err.reason);
+      }
+    }, 10000);
+  }
+
+  stopKeepAlive() {
+    if (this.aliveInterval) {
+      clearInterval(this.aliveInterval);
+      this.aliveInterval = null;
+    }
   }
 
   close() {
 
+    // vscode.window.showInformationMessage('close file');
+
     // close remote connection
-    remoteDocument.destroy();
+    this.remoteDocument.destroy();
 
     // delete local copy of file
     fs.unlinkSync(this.localFilePath);

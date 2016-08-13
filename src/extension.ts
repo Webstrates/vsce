@@ -12,12 +12,12 @@ let path = require('path');
 
 let cheerio = require('cheerio');
 
-let workspacePath;
-let serverAddress;
 let fileManager: WebstrateFileManager;
 let previewUri;
 
 function webstrateIdInput() {
+    let workspacePath = vscode.workspace.rootPath;
+
     return vscode.window.showInputBox({ prompt: 'webstrate id' })
         .then(webstrateId => {
 
@@ -42,6 +42,7 @@ const initWorkspace = function () {
  */
 const openWebstrate = function () {
 
+    let workspacePath = vscode.workspace.rootPath;
     if (!workspacePath) {
         vscode.window.showInformationMessage('Open workspace first.');
         return;
@@ -98,9 +99,11 @@ const initFileManager = function () {
     const workspacePath = vscode.workspace.rootPath;
     const config = WebstrateFileUtils.loadWorkspaceConfig(workspacePath);
 
-    serverAddress = config.serverAddress;
-    if (serverAddress) {
-        fileManager = new WebstrateFileManager(serverAddress);
+    if (config) {
+        const serverAddress = config.serverAddress;
+        if (serverAddress) {
+            fileManager = new WebstrateFileManager(serverAddress);
+        }
     }
 }
 
@@ -113,8 +116,6 @@ export function activate(context: vscode.ExtensionContext) {
     // Use the console to output diagnostic information (console.log) and errors (console.error)
     // This line of code will only be executed once when your extension is activated
     console.log('Congratulations, your extension "webstrates-editor" is now active!');
-
-    workspacePath = vscode.workspace.rootPath;
 
     // initialize Webstrates webstrate file manager
     initFileManager();

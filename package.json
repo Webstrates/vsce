@@ -2,7 +2,7 @@
   "name": "webstrates-editor",
   "displayName": "Webstrates Editor",
   "description": "Webstrates Editor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "raedle",
   "engines": {
     "vscode": "^1.4.0"

@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 
 const initialConfiguration = `{
     // DNS or IP address to connect to Webstrates server.
-    "webstrates.serverAddress": "webstrates.romanraedle.com"
+    "serverAddress": "ws://localhost:7007"
 
     // In future, further configuration options will be added to this
     // config.json. For example, authentication user/password, connection
@@ -40,6 +40,12 @@ const WebstrateFileUtils = {
 
   loadWorkspaceConfig(rootPath) {
     const webstratesConfigFileAbsolute = path.join(rootPath, this.webstratesConfigPath, this.webstratesConfigFileName);
+
+    let exists = fs.existsSync(webstratesConfigFileAbsolute);
+    if (!exists) {
+      return null;
+    }
+
     let rawConfig = fs.readFileSync(webstratesConfigFileAbsolute, 'utf8');
     return JSONC.parse(rawConfig);
   },
@@ -48,7 +54,7 @@ const WebstrateFileUtils = {
    * 
    */
   checkWorkspaceConfiguration(rootPath: string) {
-    // console.log('check workspace config');
+    // console.log('check workspace config ' + rootPath);
 
     const webstratesConfigPathAbsolute = path.join(rootPath, this.webstratesConfigPath);
     let exists = fs.existsSync(webstratesConfigPathAbsolute);

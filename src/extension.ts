@@ -9,9 +9,12 @@ import { WebstrateFileUtils } from './webstrate-file.utils';
 let fs = require('fs');
 let path = require('path');
 
+let cheerio = require('cheerio');
+
 let workspacePath;
 let serverAddress;
 let fileManager: WebstrateFileManager;
+let previewUri;
 
 function webstrateIdInput() {
     return vscode.window.showInputBox({ prompt: 'webstrate id' })
@@ -76,7 +79,10 @@ const openWebstrate = function () {
  * Shows Webstrates webstrate preview.
  */
 const showWebstratePreview = function () {
-    let uri = vscode.window.activeTextEditor.document.uri;
+    // let uri = vscode.window.activeTextEditor.document.uri;
+    let uri = previewUri;
+    WebstrateFileManager.Log('Preview Uri ' + uri);
+
     let textDocument = vscode.window.activeTextEditor.document;
 
     let webstrateFile = fileManager.getWebstrateFile(textDocument);
@@ -95,7 +101,7 @@ const saveWebstrate = function (textDocument) {
 
     const workspacePath = vscode.workspace.rootPath;
     const webstratesConfigFile = path.join(workspacePath, '.webstrates', 'config.json');
-    
+
     if (textDocument.fileName === webstratesConfigFile) {
         initFileManager();
     }
@@ -115,7 +121,7 @@ const closeWebstrate = function (textDocument) {
     console.log(textDocument);
 }
 
-const initFileManager = function() {
+const initFileManager = function () {
     const workspacePath = vscode.workspace.rootPath;
     const config = WebstrateFileUtils.loadWorkspaceConfig(workspacePath);
 
@@ -125,6 +131,86 @@ const initFileManager = function() {
     console.log('config: ' + serverAddress);
     if (serverAddress) {
         fileManager = new WebstrateFileManager(serverAddress);
+    }
+}
+
+class WebstratePreviewDocumentContentProvider implements vscode.TextDocumentContentProvider {
+
+    /**
+     * Reset preview browser style to match Webkit default style.
+     */
+    private resetStyle: string = `
+        <style type="text/css">
+        body {
+            background: rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box;
+            color: rgb(0, 0, 0);
+
+            font-family: -webkit-standard;
+            font-weight: normal;
+            font-style: normal;
+            font-size: 16px;
+
+            margin: 8px;
+            padding: 0px;
+        }
+        </style>
+    `;
+
+    private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
+
+    public provideTextDocumentContent(uri: vscode.Uri): string {
+        return this.createCssSnippet();
+    }
+
+    get onDidChange(): vscode.Event<vscode.Uri> {
+        return this._onDidChange.event;
+    }
+
+    public update(uri: vscode.Uri) {
+        this._onDidChange.fire(uri);
+    }
+
+    private createCssSnippet() {
+        let editor = vscode.window.activeTextEditor;
+        if (!(editor.document.languageId === 'html')) {
+            return this.errorSnippet("Active editor doesn't show a HTML document - no properties to preview.")
+        }
+        return this.extractSnippet();
+    }
+
+    private extractSnippet(): string {
+        let editor = vscode.window.activeTextEditor;
+        let text = editor.document.getText();
+        return this.snippet(editor.document);
+    }
+
+    private errorSnippet(error: string): string {
+        return `
+                <body>
+                    ${error}
+                </body>`;
+    }
+
+    private snippet(document: vscode.TextDocument): string {
+        const text = document.getText();
+
+        // return text;
+
+        let $ = cheerio.load(text);
+
+        // WebstrateFileManager.Log($.html());
+
+        let $head = $('head');
+        if (!$head.length) {
+            $head = $('<head></head>');
+            $('html').prepend($head);
+        }
+
+        $head.prepend(this.resetStyle);
+
+        WebstrateFileManager.Log($head);
+
+        return $.html();
     }
 }
 
@@ -142,6 +228,17 @@ export function activate(context: vscode.ExtensionContext) {
 
     // initialize Webstrates webstrate file manager
     initFileManager();
+
+    previewUri = vscode.Uri.parse('webstrate-preview://authority/webstrate-preview');
+    let provider = new WebstratePreviewDocumentContentProvider();
+    let registration = vscode.workspace.registerTextDocumentContentProvider('webstrate-preview', provider);
+    context.subscriptions.push(registration);
+
+    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
+        if (e.document === vscode.window.activeTextEditor.document) {
+            provider.update(previewUri);
+        }
+    });
 
     const initWorkspaceDisposable = vscode.commands.registerCommand('webstrates.initWorkspace', initWorkspace);
     context.subscriptions.push(initWorkspaceDisposable);

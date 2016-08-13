@@ -50,6 +50,7 @@
     "postinstall": "node ./node_modules/vscode/bin/install"
   },
   "dependencies": {
+    "cheerio": "^0.20.0",
     "chokidar": "^1.6.0",
     "json-comments": "^0.2.1",
     "json0-ot-diff": "^1.0.1",

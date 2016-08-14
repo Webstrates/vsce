@@ -1,101 +1,108 @@
 import * as vscode from 'vscode';
-import { WebstrateFile } from './file';
+import { WebstratesEditor } from './editor';
+import { Webstrate } from './webstrate';
 
 let path = require('path');
 
 class WebstrateFilesManager {
 
-  private static WebstrateChannel: vscode.OutputChannel = vscode.window.createOutputChannel('Webstrates');
   private hostAddress: String;
-  private openFiles: WebstrateFile[];
+  private openWebstrates: Webstrate[];
+
+  public onWebstrateConnected: Function;
+  public onWebstrateDisconnected: Function;
+  public onWebstrateError: Function;
 
   /**
    * 
    */
   constructor(hostAddress: String) {
     this.hostAddress = hostAddress;
-    this.openFiles = [];
-
-    // show 'Webstrates' output channel in UI
-    WebstrateFilesManager.WebstrateChannel.show();
+    this.openWebstrates = [];
   }
 
   /**
-   * 
+   * @param  {String} webstrateId
+   * @param  {String} workspacePath
    */
   requestWebstrate(webstrateId: String, workspacePath: String) {
     const filePath = path.join(workspacePath, `${webstrateId}`);
 
-    WebstrateFilesManager.Log(`Requesting webstrate '${webstrateId}' to ${filePath}`);
+    WebstratesEditor.Log(`Requesting webstrate '${webstrateId}' to ${filePath}`);
 
     // add WebstrateFile to currently open files
     // this is required to close connection workspace.onDidCloseTextDocument
-    this.openFiles.push(new WebstrateFile(webstrateId, this.hostAddress, filePath));
+    const webstrate = new Webstrate(webstrateId, this.hostAddress, filePath);
+    webstrate.onConnected = () => {
+      if (this.onWebstrateConnected) {
+        this.onWebstrateConnected({ webstrate });
+      }
+    };
+
+    webstrate.onDisconnected = () => {
+      if (this.onWebstrateDisconnected) {
+        this.onWebstrateDisconnected({ webstrate });
+      }
+    };
+
+    webstrate.onError = (error) => {
+      if (this.onWebstrateError) {
+        this.onWebstrateError({ webstrate, error });
+      }
+    };
+    webstrate.connect();
+
+    this.openWebstrates.push(webstrate);
   }
 
   /**
-   * 
+   * @param  {vscode.TextDocument} textDocument
    */
   saveWebstrate(textDocument: vscode.TextDocument) {
 
-    const webstrateFile = this.getWebstrateFile(textDocument);
-    if (webstrateFile) {
-      WebstrateFilesManager.Log(`Saving webstrate '${webstrateFile.webstrateId}'`);
-      webstrateFile.save();
+    const webstrate = this.getOpenWebstrate(textDocument);
+    if (webstrate) {
+      WebstratesEditor.Log(`Saving webstrate '${webstrate.id}'`);
+      webstrate.save();
     }
   }
-
+  
   /**
-   * 
+   * @param  {vscode.TextDocument} textDocument
    */
   closeWebstrate(textDocument: vscode.TextDocument) {
 
-    const webstrateFile = this.getWebstrateFile(textDocument);
-    if (webstrateFile) {
-      WebstrateFilesManager.Log(`Closing webstrate '${webstrateFile.webstrateId}'`);
-      webstrateFile.close();
+    const webstrate = this.getOpenWebstrate(textDocument);
+    if (webstrate) {
+      WebstratesEditor.Log(`Closing webstrate '${webstrate.id}'`);
+      webstrate.close();
     }
 
-    this.removeWebstrateFile(textDocument);
+    // remove webstrate from open webstrates
+    this.openWebstrates = this.openWebstrates.filter(webstrate => {
+      return webstrate.textDocument !== textDocument;
+    });
   }
 
   /**
-   * 
+   * @param  {vscode.TextDocument} textDocument
    */
-  public getWebstrateFile(textDocument: vscode.TextDocument) {
+  public getOpenWebstrate(textDocument: vscode.TextDocument) {
 
     // find webstrate file associated with the same text document
-    return this.openFiles.find((file, index) => {
-      return file.textDocument === textDocument;
+    return this.openWebstrates.find(webstrate => {
+      return webstrate.textDocument === textDocument;
     });
   }
-
-  /**
-   * 
-   */
-  private removeWebstrateFile(textDocument: vscode.TextDocument) {
-
-    // remove from open files
-    this.openFiles = this.openFiles.filter((file, index) => {
-      return file.textDocument !== textDocument;
-    });
-  }
-
-  /**
-   * 
-   */
-  public static Log(message: string) {
-    WebstrateFilesManager.WebstrateChannel.appendLine(message);
-  }
-
+  
   /**
    * 
    */
   dispose() {
-    this.openFiles.forEach(file => {
-      file.close();
+    this.openWebstrates.forEach(webstrate => {
+      webstrate.close();
     });
-    this.openFiles.length = 0;
+    this.openWebstrates.length = 0;
   }
 }
 

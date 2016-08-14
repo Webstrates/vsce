@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { WebstrateFilesManager } from './files-manager';
+import { WebstratesEditor } from './editor';
 
 var W3CWebSocket = require('websocket').w3cwebsocket;
 var fs = require("fs");
@@ -10,55 +10,62 @@ var jsondiff = require("json0-ot-diff");
 var jsonml = require('jsonml-tools');
 
 
-class WebstrateFile {
+class Webstrate {
 
-  public websocket: any;
-  public connection: any;
-
-  private remoteDocument : any;
-  private watcher : any;
-  private oldHtml : string;
-
-  public webstrateId: String;
+  public id: String;
   public textDocument: vscode.TextDocument;
-  private hostAddress: String;
+  public hostAddress: String;
+
+  public onConnected: Function;
+  public onDisconnected: Function;
+  public onError: Function;
+
+  private websocket: any;
+  private connection: any;
+  private remoteDocument: any;
+  private oldHtml: string;
+
   private localFilePath: string;
   private aliveInterval: any;
 
+  // Set 'true' when file is connected to corresponding webstrate, otherwise 'false'.
+  public isConnected: boolean = false;
+
   constructor(id: String, hostAddress: String, localFilePath: string = "") {
-    this.webstrateId = id;
+    this.id = id;
     this.hostAddress = hostAddress;
     this.localFilePath = localFilePath;
-
-    this.connect();
   }
 
-  private connect() {
+  /**
+   * 
+   */
+  public connect() {
     let that = this;
 
-    if (this.aliveInterval) {
-      clearInterval(this.aliveInterval);
-    }
+    // Stop any keepAlive messaging.
+    this.stopKeepAlive();
 
     this.oldHtml = "";
-    WebstrateFilesManager.Log("Connecting to " + this.hostAddress + "...");
-    // this.websocket = new W3CWebSocket("wss://" + this.hostAddress + "/ws/",
+
     this.websocket = new W3CWebSocket(this.hostAddress + "/ws/",
       // 4 times "undefined" is the perfect amount.
       undefined, undefined, undefined, undefined, {
         maxReceivedFrameSize: 1024 * 1024 * 20 // 20 MB
       });
 
+    // ShareDB connection.
     this.connection = new sharedb.Connection(this.websocket);
-
 
     var sdbOpenHandler = this.websocket.onopen;
     this.websocket.onopen = function (event) {
-      WebstrateFilesManager.Log(`Connected to Webstrate ${that.webstrateId}.`);
       sdbOpenHandler(event);
-
-      that.stopKeepAlive();
       that.startKeepAlive();
+
+      that.isConnected = true;
+      if (that.onConnected) {
+        that.onConnected();
+      }
     };
 
     // We're sending our own events over the websocket connection that we don't want messing with
@@ -67,7 +74,6 @@ class WebstrateFile {
     this.websocket.onmessage = function (event) {
       var data = JSON.parse(event.data);
       if (data.error) {
-        WebstrateFilesManager.Log("Error:" + data.error.message);
         that.close();
       }
       if (!data.wa) {
@@ -77,25 +83,39 @@ class WebstrateFile {
 
     var sdbCloseHandler = this.websocket.onclose;
     this.websocket.onclose = function (event) {
-      WebstrateFilesManager.Log("Connection closed: " + event.reason);
       that.stopKeepAlive();
-
-      WebstrateFilesManager.Log("Attempting to reconnect.");
-
-      setTimeout(() => {
-        that.connect();
-      }, 1000);
       sdbCloseHandler(event);
+
+      that.isConnected = false;
+      if (that.onDisconnected) {
+        that.onDisconnected();
+      }
+
+      // Try to reconnect after 1s timeout.
+      setTimeout(() => that.connect(), 1000);
     };
 
     var sdbErrorHandler = this.websocket.onerror;
     this.websocket.onerror = function (event) {
-      WebstrateFilesManager.Log("Connection error.");
       that.stopKeepAlive();
       sdbErrorHandler(event);
+
+      that.isConnected = false;
+      if (that.onError) {
+        that.onError();
+      }
     };
 
-    this.remoteDocument = this.connection.get("webstrates", that.webstrateId);
+    this.initSubscription();
+  }
+
+  /**
+   * 
+   */
+  initSubscription() {
+    const that = this;
+
+    this.remoteDocument = this.connection.get("webstrates", that.id);
 
     this.remoteDocument.on('op', (ops, source) => {
       var newHtml = jsonToHtml(that.remoteDocument.data)
@@ -111,7 +131,13 @@ class WebstrateFile {
       }
 
       if (!this.remoteDocument.type) {
-        vscode.window.showWarningMessage(`Webstrate ${that.webstrateId} doesn't exist on server, creating it.`);
+        if (that.onError) {
+          that.onError({
+            code: 404,
+            reason: 'webstrate.not.found'
+          });
+        }
+
         this.remoteDocument.create('json0');
         var op = [{ "p": [], "oi": ["html", {}, ["body", {}]] }];
         this.remoteDocument.submitOp(op);
@@ -151,7 +177,7 @@ class WebstrateFile {
       try {
         that.remoteDocument.submitOp(ops);
       } catch (e) {
-        WebstrateFilesManager.Log("Invalid document, rebuilding.");
+        WebstratesEditor.Log("Invalid document, rebuilding.");
         var op = [{ "p": [], "oi": ["html", {}, ["body", {}]] }];
         that.remoteDocument.submitOp(op);
       }
@@ -164,6 +190,8 @@ class WebstrateFile {
   }
 
   startKeepAlive() {
+    this.stopKeepAlive();
+
     const that = this;
     this.aliveInterval = setInterval(() => {
       // console.log('alive message');
@@ -198,7 +226,7 @@ class WebstrateFile {
   }
 }
 
-export { WebstrateFile };
+export { Webstrate };
 
 // All elements must have an attribute list, unless the element is a string
 function normalize(json): any {
@@ -234,7 +262,7 @@ function jsonToHtml(json) {
     return jsonml.toXML(json, ["area", "base", "br", "col", "embed", "hr", "img", "input",
       "keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]);
   } catch (e) {
-    WebstrateFilesManager.Log("Unable to parse JsonML.");
+    WebstratesEditor.Log("Unable to parse JsonML.");
   }
 }
 

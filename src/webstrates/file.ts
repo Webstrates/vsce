@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { WebstrateFileManager } from './webstrate-file-manager';
+import { WebstrateFilesManager } from './files-manager';
 
 var W3CWebSocket = require('websocket').w3cwebsocket;
 var fs = require("fs");
@@ -41,7 +41,7 @@ class WebstrateFile {
     }
 
     this.oldHtml = "";
-    WebstrateFileManager.Log("Connecting to " + this.hostAddress + "...");
+    WebstrateFilesManager.Log("Connecting to " + this.hostAddress + "...");
     // this.websocket = new W3CWebSocket("wss://" + this.hostAddress + "/ws/",
     this.websocket = new W3CWebSocket(this.hostAddress + "/ws/",
       // 4 times "undefined" is the perfect amount.
@@ -54,7 +54,7 @@ class WebstrateFile {
 
     var sdbOpenHandler = this.websocket.onopen;
     this.websocket.onopen = function (event) {
-      WebstrateFileManager.Log(`Connected to Webstrate ${that.webstrateId}.`);
+      WebstrateFilesManager.Log(`Connected to Webstrate ${that.webstrateId}.`);
       sdbOpenHandler(event);
 
       that.stopKeepAlive();
@@ -67,7 +67,7 @@ class WebstrateFile {
     this.websocket.onmessage = function (event) {
       var data = JSON.parse(event.data);
       if (data.error) {
-        WebstrateFileManager.Log("Error:" + data.error.message);
+        WebstrateFilesManager.Log("Error:" + data.error.message);
         that.close();
       }
       if (!data.wa) {
@@ -77,10 +77,10 @@ class WebstrateFile {
 
     var sdbCloseHandler = this.websocket.onclose;
     this.websocket.onclose = function (event) {
-      WebstrateFileManager.Log("Connection closed: " + event.reason);
+      WebstrateFilesManager.Log("Connection closed: " + event.reason);
       that.stopKeepAlive();
 
-      WebstrateFileManager.Log("Attempting to reconnect.");
+      WebstrateFilesManager.Log("Attempting to reconnect.");
 
       setTimeout(() => {
         that.connect();
@@ -90,7 +90,7 @@ class WebstrateFile {
 
     var sdbErrorHandler = this.websocket.onerror;
     this.websocket.onerror = function (event) {
-      WebstrateFileManager.Log("Connection error.");
+      WebstrateFilesManager.Log("Connection error.");
       that.stopKeepAlive();
       sdbErrorHandler(event);
     };
@@ -151,7 +151,7 @@ class WebstrateFile {
       try {
         that.remoteDocument.submitOp(ops);
       } catch (e) {
-        WebstrateFileManager.Log("Invalid document, rebuilding.");
+        WebstrateFilesManager.Log("Invalid document, rebuilding.");
         var op = [{ "p": [], "oi": ["html", {}, ["body", {}]] }];
         that.remoteDocument.submitOp(op);
       }
@@ -234,7 +234,7 @@ function jsonToHtml(json) {
     return jsonml.toXML(json, ["area", "base", "br", "col", "embed", "hr", "img", "input",
       "keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]);
   } catch (e) {
-    WebstrateFileManager.Log("Unable to parse JsonML.");
+    WebstrateFilesManager.Log("Unable to parse JsonML.");
   }
 }
 

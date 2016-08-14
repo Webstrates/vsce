@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import { WebstrateFile } from './webstrate-file';
+import { WebstrateFile } from './file';
 
 let path = require('path');
 
-class WebstrateFileManager {
+class WebstrateFilesManager {
 
   private static WebstrateChannel: vscode.OutputChannel = vscode.window.createOutputChannel('Webstrates');
   private hostAddress: String;
@@ -17,7 +17,7 @@ class WebstrateFileManager {
     this.openFiles = [];
 
     // show 'Webstrates' output channel in UI
-    WebstrateFileManager.WebstrateChannel.show();
+    WebstrateFilesManager.WebstrateChannel.show();
   }
 
   /**
@@ -26,7 +26,7 @@ class WebstrateFileManager {
   requestWebstrate(webstrateId: String, workspacePath: String) {
     const filePath = path.join(workspacePath, `${webstrateId}`);
 
-    WebstrateFileManager.Log(`Requesting webstrate '${webstrateId}' to ${filePath}`);
+    WebstrateFilesManager.Log(`Requesting webstrate '${webstrateId}' to ${filePath}`);
 
     // add WebstrateFile to currently open files
     // this is required to close connection workspace.onDidCloseTextDocument
@@ -40,7 +40,7 @@ class WebstrateFileManager {
 
     const webstrateFile = this.getWebstrateFile(textDocument);
     if (webstrateFile) {
-      WebstrateFileManager.Log(`Saving webstrate '${webstrateFile.webstrateId}'`);
+      WebstrateFilesManager.Log(`Saving webstrate '${webstrateFile.webstrateId}'`);
       webstrateFile.save();
     }
   }
@@ -52,7 +52,7 @@ class WebstrateFileManager {
 
     const webstrateFile = this.getWebstrateFile(textDocument);
     if (webstrateFile) {
-      WebstrateFileManager.Log(`Closing webstrate '${webstrateFile.webstrateId}'`);
+      WebstrateFilesManager.Log(`Closing webstrate '${webstrateFile.webstrateId}'`);
       webstrateFile.close();
     }
 
@@ -85,7 +85,7 @@ class WebstrateFileManager {
    * 
    */
   public static Log(message: string) {
-    WebstrateFileManager.WebstrateChannel.appendLine(message);
+    WebstrateFilesManager.WebstrateChannel.appendLine(message);
   }
 
   /**
@@ -99,4 +99,4 @@ class WebstrateFileManager {
   }
 }
 
-export { WebstrateFileManager };
+export { WebstrateFilesManager };

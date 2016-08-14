@@ -5,7 +5,7 @@ let path = require('path');
 import { Webstrate } from './webstrate';
 import { WebstratesErrorCodes } from './error-codes';
 import { WebstrateFilesManager } from './files-manager';
-import { WebstrateFileUtils } from './utils';
+import { WebstratesEditorUtils } from './utils';
 import { WebstratePreviewDocumentContentProvider } from './content-provider';
 
 class WebstratesEditor {
@@ -36,8 +36,7 @@ class WebstratesEditor {
    * 
    */
   private initFileManager() {
-    const workspacePath = vscode.workspace.rootPath;
-    const config = WebstrateFileUtils.loadWorkspaceConfig(workspacePath);
+    const config = WebstratesEditorUtils.loadWorkspaceConfig();
 
     if (config) {
       const serverAddress = config.serverAddress;
@@ -57,9 +56,18 @@ class WebstratesEditor {
         }
 
         this.manager.onWebstrateError = ({webstrate, error}) => {
+
+          if (!error) {
+            vscode.window.showErrorMessage('Unknown Error');
+            return;
+          }
+
           switch (error.code) {
             case WebstratesErrorCodes.WebstrateNotFound.code:
               vscode.window.showWarningMessage(WebstratesErrorCodes.WebstrateNotFound.errorTemplate(webstrate.id));
+              break;
+            case WebstratesErrorCodes.InternalServerError.code:
+              vscode.window.showErrorMessage(WebstratesErrorCodes.InternalServerError.errorTemplate());
               break;
           }
         }
@@ -132,7 +140,7 @@ class WebstratesEditor {
    * Initialize Webstrates workspace. 
    */
   private initWorkspace() {
-    WebstrateFileUtils.initWorkspace();
+    WebstratesEditorUtils.initWorkspace();
   }
 
   /**

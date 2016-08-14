@@ -6,14 +6,18 @@ import * as vscode from 'vscode';
 
 const initialConfiguration = `{
     // DNS or IP address to connect to Webstrates server.
-    "serverAddress": "ws://localhost:7007"
+    "serverAddress": "ws://localhost:7007",
+
+    "reconnect": true,
+
+    "reconnectTimeout": 10000
 
     // In future, further configuration options will be added to this
     // config.json. For example, authentication user/password, connection
     // timeout, or SSL enable/disabled.
 }`;
 
-const WebstrateFileUtils = {
+const WebstratesEditorUtils = {
 
   webstratesConfigPath: '.webstrates',
   webstratesConfigFileName: 'config.json',
@@ -38,7 +42,8 @@ const WebstrateFileUtils = {
     });
   },
 
-  loadWorkspaceConfig(rootPath) {
+  loadWorkspaceConfig() {
+    const rootPath = vscode.workspace.rootPath;
     const webstratesConfigFileAbsolute = path.join(rootPath, this.webstratesConfigPath, this.webstratesConfigFileName);
 
     let exists = fs.existsSync(webstratesConfigFileAbsolute);
@@ -72,4 +77,4 @@ const WebstrateFileUtils = {
   }
 }
 
-export { WebstrateFileUtils }
+export { WebstratesEditorUtils }

@@ -1,6 +1,3 @@
-import * as vscode from 'vscode';
-import { WebstratesEditor } from './editor';
-
 var W3CWebSocket = require('websocket').w3cwebsocket;
 var fs = require("fs");
 var chokidar = require("chokidar");
@@ -9,23 +6,23 @@ var jsonmlParse = require("jsonml-parse");
 var jsondiff = require("json0-ot-diff");
 var jsonml = require('jsonml-tools');
 
-
 class Webstrate {
 
   public id: String;
-  public textDocument: vscode.TextDocument;
+
   public hostAddress: String;
+  public localFilePath: string;
 
   public onConnected: Function;
   public onDisconnected: Function;
   public onError: Function;
+  public onData: Function;
 
   private websocket: any;
   private connection: any;
   private remoteDocument: any;
   private oldHtml: string;
 
-  private localFilePath: string;
   private aliveInterval: any;
 
   // Set 'true' when file is connected to corresponding webstrate, otherwise 'false'.
@@ -90,9 +87,6 @@ class Webstrate {
       if (that.onDisconnected) {
         that.onDisconnected();
       }
-
-      // Try to reconnect after 1s timeout.
-      setTimeout(() => that.connect(), 1000);
     };
 
     var sdbErrorHandler = this.websocket.onerror;
@@ -102,7 +96,10 @@ class Webstrate {
 
       that.isConnected = false;
       if (that.onError) {
-        that.onError();
+        that.onError({
+            code: 500,
+            reason: 'internal.server.error'
+          });
       }
     };
 
@@ -148,23 +145,15 @@ class Webstrate {
 
       // window.createTextEditorDecorationType({});
 
-      vscode.workspace.openTextDocument(that.localFilePath).then(doc => {
-
-        // associate text document with webstrate file
-        that.textDocument = doc;
-
-        vscode.window.showTextDocument(doc).then(editor => {
-          // editor.setDecorations()
-          // WebstrateFileManager.Log(`language id ${doc.languageId}`);
-        });
-      });
+      if (that.onData) {
+        that.onData();
+      }
     });
   }
 
-  save() {
+  save(newHtml: string) {
     const that = this;
 
-    const newHtml = this.textDocument.getText();
     if (newHtml === this.oldHtml) {
       return;
     }
@@ -177,7 +166,12 @@ class Webstrate {
       try {
         that.remoteDocument.submitOp(ops);
       } catch (e) {
-        WebstratesEditor.Log("Invalid document, rebuilding.");
+
+        that.onError({
+          code: 0,
+          reason: 'invalid.document'
+        });
+        
         var op = [{ "p": [], "oi": ["html", {}, ["body", {}]] }];
         that.remoteDocument.submitOp(op);
       }
@@ -262,7 +256,7 @@ function jsonToHtml(json) {
     return jsonml.toXML(json, ["area", "base", "br", "col", "embed", "hr", "img", "input",
       "keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]);
   } catch (e) {
-    WebstratesEditor.Log("Unable to parse JsonML.");
+    console.error("Unable to parse JsonML.");
   }
 }
 

@@ -1,24 +1,27 @@
 import * as vscode from 'vscode';
 import { WebstratesEditor } from './editor';
+import { WebstratesEditorUtils } from './utils';
 import { Webstrate } from './webstrate';
+import { Dictionary } from '../collections';
 
 let path = require('path');
 
 class WebstrateFilesManager {
 
-  private hostAddress: String;
-  private openWebstrates: Webstrate[];
-
   public onWebstrateConnected: Function;
   public onWebstrateDisconnected: Function;
   public onWebstrateError: Function;
+
+  private hostAddress: String;
+
+  private documentsToWebstrates: Dictionary<vscode.TextDocument, Webstrate>;
 
   /**
    * 
    */
   constructor(hostAddress: String) {
     this.hostAddress = hostAddress;
-    this.openWebstrates = [];
+    this.documentsToWebstrates = new Dictionary<vscode.TextDocument, Webstrate>();
   }
 
   /**
@@ -43,6 +46,15 @@ class WebstrateFilesManager {
       if (this.onWebstrateDisconnected) {
         this.onWebstrateDisconnected({ webstrate });
       }
+
+      const config = WebstratesEditorUtils.loadWorkspaceConfig();
+
+      if (config.reconnect) {
+        // Try to reconnect after 10s timeout.
+        setTimeout(() => {
+          webstrate.connect();
+        }, config.reconnectTimeout);
+      }
     };
 
     webstrate.onError = (error) => {
@@ -50,9 +62,21 @@ class WebstrateFilesManager {
         this.onWebstrateError({ webstrate, error });
       }
     };
-    webstrate.connect();
 
-    this.openWebstrates.push(webstrate);
+    webstrate.onData = () => {
+      vscode.workspace.openTextDocument(webstrate.localFilePath).then(doc => {
+
+        // associate text document with webstrate file
+        this.documentsToWebstrates.add(doc, webstrate);
+
+        vscode.window.showTextDocument(doc).then(editor => {
+          // editor.setDecorations()
+          // WebstrateFileManager.Log(`language id ${doc.languageId}`);
+        });
+      });
+    }
+
+    webstrate.connect();
   }
 
   /**
@@ -63,10 +87,10 @@ class WebstrateFilesManager {
     const webstrate = this.getOpenWebstrate(textDocument);
     if (webstrate) {
       WebstratesEditor.Log(`Saving webstrate '${webstrate.id}'`);
-      webstrate.save();
+      webstrate.save(textDocument.getText());
     }
   }
-  
+
   /**
    * @param  {vscode.TextDocument} textDocument
    */
@@ -79,9 +103,7 @@ class WebstrateFilesManager {
     }
 
     // remove webstrate from open webstrates
-    this.openWebstrates = this.openWebstrates.filter(webstrate => {
-      return webstrate.textDocument !== textDocument;
-    });
+    this.documentsToWebstrates.remove(textDocument);
   }
 
   /**
@@ -90,19 +112,17 @@ class WebstrateFilesManager {
   public getOpenWebstrate(textDocument: vscode.TextDocument) {
 
     // find webstrate file associated with the same text document
-    return this.openWebstrates.find(webstrate => {
-      return webstrate.textDocument === textDocument;
-    });
+    return this.documentsToWebstrates.get(textDocument);
   }
-  
+
   /**
    * 
    */
   dispose() {
-    this.openWebstrates.forEach(webstrate => {
+    this.documentsToWebstrates.values().forEach(webstrate => {
       webstrate.close();
     });
-    this.openWebstrates.length = 0;
+    this.documentsToWebstrates.clear();
   }
 }
 

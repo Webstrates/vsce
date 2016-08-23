@@ -63,6 +63,9 @@ class WebstratesEditor {
           }
 
           switch (error.code) {
+            case WebstratesErrorCodes.AccessForbidden.code:
+              vscode.window.showErrorMessage(WebstratesErrorCodes.AccessForbidden.errorTemplate(webstrate.id));
+              break;
             case WebstratesErrorCodes.WebstrateNotFound.code:
               vscode.window.showWarningMessage(WebstratesErrorCodes.WebstrateNotFound.errorTemplate(webstrate.id));
               break;

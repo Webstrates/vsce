@@ -1,6 +1,5 @@
 var W3CWebSocket = require('websocket').w3cwebsocket;
 var fs = require("fs");
-var chokidar = require("chokidar");
 var sharedb = require("sharedb/lib/client");
 var jsonmlParse = require("jsonml-parse");
 var jsondiff = require("json0-ot-diff");
@@ -45,9 +44,22 @@ class Webstrate {
 
     this.oldHtml = "";
 
-    this.websocket = new W3CWebSocket(this.hostAddress + "/ws/",
-      // 4 times "undefined" is the perfect amount.
-      undefined, undefined, undefined, undefined, {
+    // https://github.com/theturtle32/WebSocket-Node/blob/19108bbfd7d94a5cd02dbff3495eafee9e901ca4/docs/W3CWebSocket.md
+    this.websocket = new W3CWebSocket(
+      // requestUrl
+      this.hostAddress + "/ws/",
+      // requestedProtocols
+      undefined,
+      // origin
+      undefined,
+      // headers
+      {
+        // cookie: "session=XXX"
+      },
+      // requestOptions
+      undefined,
+      // clientConfig
+      {
         maxReceivedFrameSize: 1024 * 1024 * 20 // 20 MB
       });
 
@@ -71,6 +83,12 @@ class Webstrate {
     this.websocket.onmessage = function (event) {
       var data = JSON.parse(event.data);
       if (data.error) {
+        if (that.onError) {
+          that.onError({
+            code: 403,
+            reason: data.error.message
+          });
+        }
         that.close();
       }
       if (!data.wa) {
@@ -98,7 +116,7 @@ class Webstrate {
       if (that.onError) {
         that.onError({
             code: 500,
-            reason: 'internal.server.error'
+            reason: 'internal.server.error: ' + event.reason
           });
       }
     };
@@ -216,7 +234,9 @@ class Webstrate {
     this.remoteDocument.destroy();
 
     // delete local copy of file
-    fs.unlinkSync(this.localFilePath);
+    if (fs.existsSync(this.localFilePath)) {
+      fs.unlinkSync(this.localFilePath);
+    }
   }
 }
 

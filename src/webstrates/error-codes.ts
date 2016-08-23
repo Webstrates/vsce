@@ -1,4 +1,12 @@
 class WebstratesErrorCodes {
+
+  public static AccessForbidden = {
+    code: 403,
+    errorTemplate: (id) => {
+      return `Access to ${id} forbidden`
+    }
+  }
+
   public static WebstrateNotFound = {
     code: 404,
     errorTemplate: (id) => {

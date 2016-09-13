@@ -1,9 +1,10 @@
-var W3CWebSocket = require('websocket').w3cwebsocket;
-var fs = require("fs");
-var sharedb = require("sharedb/lib/client");
-var jsonmlParse = require("jsonml-parse");
-var jsondiff = require("json0-ot-diff");
-var jsonml = require('jsonml-tools');
+const W3CWebSocket = require('websocket').w3cwebsocket;
+const fs = require("fs");
+const cheerio = require("cheerio");
+const sharedb = require("sharedb/lib/client");
+const jsonmlParse = require("jsonml-parse");
+const jsondiff = require("json0-ot-diff");
+const jsonml = require('jsonml-tools');
 
 class Webstrate {
 
@@ -21,6 +22,7 @@ class Webstrate {
   private connection: any;
   private remoteDocument: any;
   private oldHtml: string;
+  private $: any;
 
   private aliveInterval: any;
 
@@ -115,9 +117,9 @@ class Webstrate {
       that.isConnected = false;
       if (that.onError) {
         that.onError({
-            code: 500,
-            reason: 'internal.server.error: ' + event.reason
-          });
+          code: 500,
+          reason: 'internal.server.error: ' + event.reason
+        });
       }
     };
 
@@ -177,6 +179,19 @@ class Webstrate {
     }
 
     this.oldHtml = newHtml;
+    // Replace script or style and receive back valid html document.
+    if (this.$) {
+      var $webstrateContent = this.$('#webstrate');
+      // Create container if it does not exist.
+      if (!$webstrateContent.length) {
+        $webstrateContent = this.$('<pre />');
+        $webstrateContent.attr('id', 'webstrate');
+        this.$('body').append($webstrateContent);
+      }
+      $webstrateContent.text(newHtml);
+      newHtml = this.$.html();
+    }
+
     htmlToJson(newHtml, function (newJson) {
       var normalizedOldJson = normalize(that.remoteDocument.data);
       var normalizedNewJson = normalize(newJson);
@@ -189,7 +204,7 @@ class Webstrate {
           code: 0,
           reason: 'invalid.document'
         });
-        
+
         var op = [{ "p": [], "oi": ["html", {}, ["body", {}]] }];
         that.remoteDocument.submitOp(op);
       }
@@ -197,6 +212,12 @@ class Webstrate {
   }
 
   private writeDocument(html) {
+    // Load content of #webstrate element if webstrate id ends with .js or .css
+    if (this.id.endsWith(".js") || this.id.endsWith(".css")) {
+      this.$ = cheerio.load(html);
+      var $webstrateContent = this.$('#webstrate');
+      html = $webstrateContent.length ? $webstrateContent.text() : "";
+    }
     this.oldHtml = html;
     fs.writeFileSync(this.localFilePath, html);
   }
@@ -271,18 +292,34 @@ function normalize(json): any {
   return [tagName.toLowerCase(), attributes, ...elementList];
 }
 
+function recurse(xs, callback) {
+  return xs.map(function (x) {
+    if (typeof x === "string") return callback(x, xs);
+    if (Array.isArray(x)) return recurse(x, callback);
+    return x;
+  });
+}
+
 function jsonToHtml(json) {
+  json = recurse(json, function (str, parent) {
+    if (["script", "style"].indexOf(parent[0]) > -1) { return str; }
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  });
   try {
     return jsonml.toXML(json, ["area", "base", "br", "col", "embed", "hr", "img", "input",
       "keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]);
   } catch (e) {
-    console.error("Unable to parse JsonML.");
+    console.log("Unable to parse JsonML.");
   }
 }
 
 function htmlToJson(html, callback) {
   jsonmlParse(html.trim(), function (err, jsonml) {
     if (err) throw err;
+    jsonml = recurse(jsonml, function (str, parent) {
+      if (["script", "style"].indexOf(parent[0]) > -1) { return str; }
+      return str.replace(/&gt;/g, ">").replace(/&lt;/g, "<").replace(/&amp;/g, "&");
+    });
     callback(jsonml);
-  });
+  }, { preserveEntities: true });
 }

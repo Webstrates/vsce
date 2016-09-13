@@ -178,7 +178,7 @@ class Webstrate {
       return;
     }
 
-    this.oldHtml = newHtml;
+    this.oldHtml = newHtml; 
     // Replace script or style and receive back valid html document.
     if (this.$) {
       var $webstrateContent = this.$('#webstrate');
@@ -208,7 +208,7 @@ class Webstrate {
         var op = [{ "p": [], "oi": ["html", {}, ["body", {}]] }];
         that.remoteDocument.submitOp(op);
       }
-    });
+    }, !(this.id.endsWith(".js") || this.id.endsWith(".css")));
   }
 
   private writeDocument(html) {
@@ -313,7 +313,7 @@ function jsonToHtml(json) {
   }
 }
 
-function htmlToJson(html, callback) {
+function htmlToJson(html, callback, preserveEntities = true) {
   jsonmlParse(html.trim(), function (err, jsonml) {
     if (err) throw err;
     jsonml = recurse(jsonml, function (str, parent) {
@@ -321,5 +321,5 @@ function htmlToJson(html, callback) {
       return str.replace(/&gt;/g, ">").replace(/&lt;/g, "<").replace(/&amp;/g, "&");
     });
     callback(jsonml);
-  }, { preserveEntities: true });
+  }, { preserveEntities });
 }

@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 
-let path = require('path');
+const path = require('path');
 
-import { Webstrate } from './webstrate';
+import { FileDocument } from './file-document';
 import { WebstratesErrorCodes } from './error-codes';
 import { WebstrateFilesManager } from './files-manager';
 import { WebstratesEditorUtils } from './utils';
@@ -16,7 +16,7 @@ class WebstratesEditor {
   private context: vscode.ExtensionContext;
   private manager: WebstrateFilesManager;
   private previewUri: vscode.Uri;
-  private activeWebstrate: Webstrate;
+  private activeFileDocument: FileDocument;
 
   /**
    * @param  {vscode.ExtensionContext} context
@@ -30,6 +30,24 @@ class WebstratesEditor {
     this.initEvents();
     this.initPreview();
     this.initOutput();
+
+    vscode.workspace.onDidOpenTextDocument(document => {
+      let webstrateId = path.posix.basename(document.fileName);
+
+      // Quick check for .webstrates configuration folder in workspace. This is not optimal
+      // since it could also be a webstrateId or it could be a subfolder.
+      // Ignore if it is the .webstrates configuration folder.
+      if (document.fileName.lastIndexOf('.webstrates') > -1) {
+        return;
+      }
+
+      let fileDocument = this.manager.getOpenFileDocument(document);
+      if (!fileDocument) {
+        console.warn(`webstate not found ${webstrateId}`);
+
+        this.openWebstrate(webstrateId, document);
+      }
+    });
   }
 
   /**
@@ -43,19 +61,19 @@ class WebstratesEditor {
       if (serverAddress) {
         this.manager = new WebstrateFilesManager(serverAddress);
 
-        this.manager.onWebstrateConnected = ({webstrate}) => {
-          if (this.activeWebstrate === webstrate) {
+        this.manager.onWebstrateDidConnect(({fileDocument}) => {
+          if (this.activeFileDocument === fileDocument) {
             this.updateStatus();
           }
-        }
+        });
 
-        this.manager.onWebstrateDisconnected = ({webstrate}) => {
-          if (this.activeWebstrate === webstrate) {
+        this.manager.onWebstrateDidDisconnect(({fileDocument}) => {
+          if (this.activeFileDocument === fileDocument) {
             this.updateStatus();
           }
-        }
+        });
 
-        this.manager.onWebstrateError = ({webstrate, error}) => {
+        this.manager.onWebstrateError(({fileDocument, error}) => {
 
           if (!error) {
             vscode.window.showErrorMessage('Unknown Error');
@@ -64,16 +82,16 @@ class WebstratesEditor {
 
           switch (error.code) {
             case WebstratesErrorCodes.AccessForbidden.code:
-              vscode.window.showErrorMessage(WebstratesErrorCodes.AccessForbidden.errorTemplate(webstrate.id));
+              vscode.window.showErrorMessage(WebstratesErrorCodes.AccessForbidden.errorTemplate(fileDocument.id));
               break;
             case WebstratesErrorCodes.WebstrateNotFound.code:
-              vscode.window.showWarningMessage(WebstratesErrorCodes.WebstrateNotFound.errorTemplate(webstrate.id));
+              vscode.window.showWarningMessage(WebstratesErrorCodes.WebstrateNotFound.errorTemplate(fileDocument.id));
               break;
             case WebstratesErrorCodes.InternalServerError.code:
               vscode.window.showErrorMessage(WebstratesErrorCodes.InternalServerError.errorTemplate());
               break;
           }
-        }
+        });
       }
     }
   }
@@ -117,10 +135,10 @@ class WebstratesEditor {
       provider.update(this.previewUri);
 
       const activeTextDocument = textEditor.document;
-      const webstrate = this.manager.getOpenWebstrate(activeTextDocument);
+      const fileDocument = this.manager.getOpenFileDocument(activeTextDocument);
 
-      if (webstrate) {
-        this.activeWebstrate = webstrate;
+      if (fileDocument) {
+        this.activeFileDocument = fileDocument;
         this.updateStatus();
       }
     });
@@ -149,7 +167,7 @@ class WebstratesEditor {
   /**
    * Open Webstrates webstrate.
    */
-  private openWebstrate() {
+  private openWebstrate(webstrateId: string = null, document: vscode.TextDocument = null) {
 
     let workspacePath = vscode.workspace.rootPath;
     if (!workspacePath) {
@@ -157,7 +175,23 @@ class WebstratesEditor {
       return;
     }
 
-    this.webstrateIdInput();
+    if (!webstrateId) {
+      var inputPromise = this.webstrateIdInput();
+      inputPromise.then(webstrateId => {
+
+        // webstrateId will be 'undefined' on cancel input
+        if (!webstrateId) {
+          return;
+        }
+
+        const filePath = path.join(workspacePath, `${webstrateId}`);
+        this.manager.requestWebstrate(webstrateId, filePath);
+      });
+    }
+    else {
+      const filePath = document.fileName;
+      this.manager.requestWebstrate(webstrateId, filePath);
+    }
   }
 
   /**
@@ -167,7 +201,12 @@ class WebstratesEditor {
    */
   private closeWebstrate(textDocument) {
     // vscode.window.showInformationMessage('close text doc');
-    this.manager.closeWebstrate(textDocument);
+
+    const config = WebstratesEditorUtils.loadWorkspaceConfig();
+    // const deleteLocalFile = typeof config.deleteLocalFilesOnClose === "undefined" ? true : config.deleteLocalFilesOnClose;
+    const deleteLocalFile = !!config.deleteLocalFilesOnClose;
+
+    this.manager.closeWebstrate(textDocument, deleteLocalFile);
   }
 
   /**
@@ -180,8 +219,8 @@ class WebstratesEditor {
 
     let textDocument = vscode.window.activeTextEditor.document;
 
-    let webstrate = this.manager.getOpenWebstrate(textDocument);
-    let webstrateId = webstrate.id;
+    let fileDocument = this.manager.getOpenFileDocument(textDocument);
+    let webstrateId = fileDocument.id;
 
     return vscode.commands.executeCommand('vscode.previewHtml', uri, vscode.ViewColumn.Two, `Webstrate Preview`).then((success) => {
     }, (reason) => {
@@ -211,17 +250,7 @@ class WebstratesEditor {
    */
   private webstrateIdInput() {
     let workspacePath = vscode.workspace.rootPath;
-
-    return vscode.window.showInputBox({ prompt: 'webstrate id' })
-      .then(webstrateId => {
-
-        // webstrateId will be 'undefined' on cancel input
-        if (!webstrateId) {
-          return;
-        }
-
-        this.manager.requestWebstrate(webstrateId, workspacePath);
-      });
+    return vscode.window.showInputBox({ prompt: 'webstrate id' });
   }
 
   /**
@@ -250,11 +279,15 @@ class WebstratesEditor {
    * 
    */
   private updateStatus() {
-    const isConnected = this.activeWebstrate.isConnected;
-    const status = isConnected ? 'Connected' : 'Disconnected';
-    const tooltip = `${this.activeWebstrate.hostAddress}`;
+    if (!this.activeFileDocument) {
+      return;
+    }
 
-    WebstratesEditor.SetStatus(status, tooltip);
+    const isConnected = this.activeFileDocument.isConnected;
+    const status = isConnected ? 'Connected' : 'Disconnected';
+    // const tooltip = `${this.activeFileDocument.hostAddress}`;
+
+    WebstratesEditor.SetStatus(status/*, tooltip*/);
   }
 
   /**
@@ -262,7 +295,12 @@ class WebstratesEditor {
    */
   public dispose() {
     if (this.manager) {
-      this.manager.dispose();
+
+      const config = WebstratesEditorUtils.loadWorkspaceConfig();
+      // const deleteLocalFile = typeof config.deleteLocalFilesOnClose === "undefined" ? true : config.deleteLocalFilesOnClose;
+      const deleteLocalFile = !!config.deleteLocalFilesOnClose;
+
+      this.manager.dispose(deleteLocalFile);
       this.manager = null;
     }
   }

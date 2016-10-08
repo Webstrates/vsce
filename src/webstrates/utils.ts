@@ -10,7 +10,9 @@ const initialConfiguration = `{
 
     "reconnect": true,
 
-    "reconnectTimeout": 10000
+    "reconnectTimeout": 10000,
+
+    "deleteLocalFilesOnClose": false
 
     // In future, further configuration options will be added to this
     // config.json. For example, authentication user/password, connection

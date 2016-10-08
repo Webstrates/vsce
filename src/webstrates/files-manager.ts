@@ -1,82 +1,100 @@
+const path = require('path');
+const ee = require('event-emitter');
+
 import * as vscode from 'vscode';
 import { WebstratesEditor } from './editor';
 import { WebstratesEditorUtils } from './utils';
-import { Webstrate } from './webstrate';
+import { WebstratesClient } from './webstrates-client';
+import { FileDocument } from './file-document';
 import { Dictionary } from '../collections';
-
-let path = require('path');
 
 class WebstrateFilesManager {
 
-  public onWebstrateConnected: Function;
-  public onWebstrateDisconnected: Function;
-  public onWebstrateError: Function;
+  private eventEmitter: any;
 
   private hostAddress: String;
+  private webstratesClient: WebstratesClient;
 
-  private documentsToWebstrates: Dictionary<vscode.TextDocument, Webstrate>;
+  private documentsToWebstrates: Dictionary<vscode.TextDocument, FileDocument>;
 
   /**
    * 
    */
   constructor(hostAddress: String) {
+    this.eventEmitter = ee({});
     this.hostAddress = hostAddress;
-    this.documentsToWebstrates = new Dictionary<vscode.TextDocument, Webstrate>();
+    this.documentsToWebstrates = new Dictionary<vscode.TextDocument, FileDocument>();
+
+    this.webstratesClient = new WebstratesClient(hostAddress);
+  }
+
+  onWebstrateDidConnect(listener: Function) {
+    this.onEvent("connected", listener);
+  }
+
+  onWebstrateDidDisconnect(listener: Function) {
+    this.onEvent("disconnected", listener);
+  }
+
+  onWebstrateError(listener: Function) {
+    this.onEvent("error", listener);
+  }
+
+  private onEvent(eventName: string, listener: Function) {
+    this.eventEmitter.on(eventName, listener);
+
+    return {
+      dispose() {
+        this.eventEmitter.off(eventName, listener);
+      }
+    };
   }
 
   /**
    * @param  {String} webstrateId
    * @param  {String} workspacePath
    */
-  requestWebstrate(webstrateId: String, workspacePath: String) {
-    const filePath = path.join(workspacePath, `${webstrateId}`);
-
+  requestWebstrate(webstrateId: String, filePath: string) {
     WebstratesEditor.Log(`Requesting webstrate '${webstrateId}' to ${filePath}`);
 
     // add WebstrateFile to currently open files
     // this is required to close connection workspace.onDidCloseTextDocument
-    const webstrate = new Webstrate(webstrateId, this.hostAddress, filePath);
-    webstrate.onConnected = () => {
-      if (this.onWebstrateConnected) {
-        this.onWebstrateConnected({ webstrate });
-      }
-    };
+    const fileDocument = this.webstratesClient.openDocumentAsFile(webstrateId, filePath);
+    fileDocument.onDidConnect(() => {
+      this.eventEmitter.emit("connected", { fileDocument });
+    });
 
-    webstrate.onDisconnected = () => {
-      if (this.onWebstrateDisconnected) {
-        this.onWebstrateDisconnected({ webstrate });
-      }
+    fileDocument.onDidDisconnect(() => {
+      this.eventEmitter.emit("disconnected", { fileDocument });
 
       const config = WebstratesEditorUtils.loadWorkspaceConfig();
 
       if (config.reconnect) {
         // Try to reconnect after 10s timeout.
         setTimeout(() => {
-          webstrate.connect();
+          fileDocument.connect();
         }, config.reconnectTimeout);
       }
-    };
+    });
 
-    webstrate.onError = (error) => {
-      if (this.onWebstrateError) {
-        this.onWebstrateError({ webstrate, error });
-      }
-    };
+    fileDocument.onError(error => {
+      this.eventEmitter.emit("error", { fileDocument, error });
+    });
 
-    webstrate.onData = () => {
-      vscode.workspace.openTextDocument(webstrate.localFilePath).then(doc => {
+    fileDocument.onData(() => {
+      vscode.workspace.openTextDocument(filePath).then(doc => {
 
         // associate text document with webstrate file
-        this.documentsToWebstrates.add(doc, webstrate);
+        this.documentsToWebstrates.add(doc, fileDocument);
 
         vscode.window.showTextDocument(doc).then(editor => {
           // editor.setDecorations()
           // WebstrateFileManager.Log(`language id ${doc.languageId}`);
         });
       });
-    }
+    });
 
-    webstrate.connect();
+    fileDocument.connect();
   }
 
   /**
@@ -84,9 +102,8 @@ class WebstrateFilesManager {
    */
   saveWebstrate(textDocument: vscode.TextDocument) {
 
-    const webstrate = this.getOpenWebstrate(textDocument);
+    const webstrate = this.getOpenFileDocument(textDocument);
     if (webstrate) {
-      WebstratesEditor.Log(`Saving webstrate '${webstrate.id}'`);
       webstrate.save(textDocument.getText());
     }
   }
@@ -94,12 +111,11 @@ class WebstrateFilesManager {
   /**
    * @param  {vscode.TextDocument} textDocument
    */
-  closeWebstrate(textDocument: vscode.TextDocument) {
+  closeWebstrate(textDocument: vscode.TextDocument, deleteLocalFile: boolean = true) {
 
-    const webstrate = this.getOpenWebstrate(textDocument);
+    const webstrate = this.getOpenFileDocument(textDocument);
     if (webstrate) {
-      WebstratesEditor.Log(`Closing webstrate '${webstrate.id}'`);
-      webstrate.close();
+      webstrate.close(deleteLocalFile);
     }
 
     // remove webstrate from open webstrates
@@ -109,7 +125,7 @@ class WebstrateFilesManager {
   /**
    * @param  {vscode.TextDocument} textDocument
    */
-  public getOpenWebstrate(textDocument: vscode.TextDocument) {
+  public getOpenFileDocument(textDocument: vscode.TextDocument) {
 
     // find webstrate file associated with the same text document
     return this.documentsToWebstrates.get(textDocument);
@@ -118,9 +134,9 @@ class WebstrateFilesManager {
   /**
    * 
    */
-  dispose() {
+  dispose(deleteLocalFile: boolean = true) {
     this.documentsToWebstrates.values().forEach(webstrate => {
-      webstrate.close();
+      webstrate.close(deleteLocalFile);
     });
     this.documentsToWebstrates.clear();
   }

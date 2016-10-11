@@ -3,7 +3,7 @@ const ee = require('event-emitter');
 
 import * as vscode from 'vscode';
 import { WebstratesEditor } from './editor';
-import { WebstratesEditorUtils } from './utils';
+import { Utils } from './utils';
 import { WebstratesClient } from './webstrates-client';
 import { FileDocument } from './file-document';
 import { Dictionary } from '../collections';
@@ -28,15 +28,15 @@ class WebstrateFilesManager {
     this.webstratesClient = new WebstratesClient(hostAddress);
   }
 
-  onWebstrateDidConnect(listener: Function) {
+  onDidDocumentConnect(listener: Function) {
     this.onEvent("connected", listener);
   }
 
-  onWebstrateDidDisconnect(listener: Function) {
+  onDidDocumentDisconnect(listener: Function) {
     this.onEvent("disconnected", listener);
   }
 
-  onWebstrateError(listener: Function) {
+  onDocumentError(listener: Function) {
     this.onEvent("error", listener);
   }
 
@@ -56,6 +56,7 @@ class WebstrateFilesManager {
    */
   requestWebstrate(webstrateId: String, filePath: string) {
     WebstratesEditor.Log(`Requesting webstrate '${webstrateId}' to ${filePath}`);
+    WebstratesEditor.SetStatus(`Requesting ${webstrateId}`);
 
     // add WebstrateFile to currently open files
     // this is required to close connection workspace.onDidCloseTextDocument
@@ -67,7 +68,7 @@ class WebstrateFilesManager {
     fileDocument.onDidDisconnect(() => {
       this.eventEmitter.emit("disconnected", { fileDocument });
 
-      const config = WebstratesEditorUtils.loadWorkspaceConfig();
+      const config = Utils.loadWorkspaceConfig();
 
       if (config.reconnect) {
         // Try to reconnect after 10s timeout.
@@ -82,6 +83,7 @@ class WebstrateFilesManager {
     });
 
     fileDocument.onData(() => {
+      WebstratesEditor.SetStatus(`${webstrateId} Online`, false);
       vscode.workspace.openTextDocument(filePath).then(doc => {
 
         // associate text document with webstrate file

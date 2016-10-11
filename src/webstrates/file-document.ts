@@ -125,8 +125,17 @@ class FileDocument {
       WebstratesEditor.Log(`${event.message}: ${event.error} [jsonML=${event.jsonML}]`);
     });
 
+    let timeout;
+
     document.onUpdateOp(html => {
-      this.writeToFile(html);
+
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+
+      timeout = setTimeout(() => {
+        this.writeToFile(html);
+      }, 500);
     });
 
     document.onUpdate(html => {

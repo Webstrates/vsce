@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 
 const path = require('path');
+var elegantSpinner = require('elegant-spinner');
+var frame = elegantSpinner();
 
 import { FileDocument } from './file-document';
 import { WebstratesErrorCodes } from './error-codes';
 import { WebstrateFilesManager } from './files-manager';
-import { WebstratesEditorUtils } from './utils';
+import { Utils } from './utils';
 import { WebstratePreviewDocumentContentProvider } from './content-provider';
 
 class WebstratesEditor {
@@ -17,6 +19,9 @@ class WebstratesEditor {
   private manager: WebstrateFilesManager;
   private previewUri: vscode.Uri;
   private activeFileDocument: FileDocument;
+
+  // Spinner interval -> used in status bar to show a progressing spinner before message.
+  private static statusBarSpinnerInterval: any;
 
   /**
    * @param  {vscode.ExtensionContext} context
@@ -31,64 +36,54 @@ class WebstratesEditor {
     this.initPreview();
     this.initOutput();
 
-    vscode.workspace.onDidOpenTextDocument(document => {
-      let webstrateId = path.posix.basename(document.fileName);
-
-      // Quick check for .webstrates configuration folder in workspace. This is not optimal
-      // since it could also be a webstrateId or it could be a subfolder.
-      // Ignore if it is the .webstrates configuration folder.
-      if (document.fileName.lastIndexOf('.webstrates') > -1) {
-        return;
-      }
-
-      let fileDocument = this.manager.getOpenFileDocument(document);
-      if (!fileDocument) {
-        console.warn(`webstate not found ${webstrateId}`);
-
-        this.openWebstrate(webstrateId, document);
-      }
-    });
+    // Show a 3 seconds status message that Webstrates editor has sucessfully loaded.
+    vscode.window.setStatusBarMessage("Webstrates Editor successfully loaded.", 3000);
   }
 
   /**
+   * Initialize file manager.
    * 
+   * @private
+   * 
+   * @memberOf WebstratesEditor
    */
   private initFileManager() {
-    const config = WebstratesEditorUtils.loadWorkspaceConfig();
+    const config = Utils.loadWorkspaceConfig();
 
     if (config) {
       const serverAddress = config.serverAddress;
       if (serverAddress) {
         this.manager = new WebstrateFilesManager(serverAddress);
 
-        this.manager.onWebstrateDidConnect(({fileDocument}) => {
+        this.manager.onDidDocumentConnect(({fileDocument}) => {
           if (this.activeFileDocument === fileDocument) {
             this.updateStatus();
           }
         });
 
-        this.manager.onWebstrateDidDisconnect(({fileDocument}) => {
+        this.manager.onDidDocumentDisconnect(({fileDocument}) => {
           if (this.activeFileDocument === fileDocument) {
             this.updateStatus();
           }
         });
 
-        this.manager.onWebstrateError(({fileDocument, error}) => {
+        this.manager.onDocumentError(({fileDocument, error}) => {
 
           if (!error) {
             vscode.window.showErrorMessage('Unknown Error');
             return;
           }
 
+          let thenable: Thenable<string> = null;
           switch (error.code) {
             case WebstratesErrorCodes.AccessForbidden.code:
-              vscode.window.showErrorMessage(WebstratesErrorCodes.AccessForbidden.errorTemplate(fileDocument.id));
+              thenable = vscode.window.showErrorMessage(WebstratesErrorCodes.AccessForbidden.errorTemplate(fileDocument.id));
               break;
             case WebstratesErrorCodes.WebstrateNotFound.code:
-              vscode.window.showWarningMessage(WebstratesErrorCodes.WebstrateNotFound.errorTemplate(fileDocument.id));
+              thenable = vscode.window.showWarningMessage(WebstratesErrorCodes.WebstrateNotFound.errorTemplate(fileDocument.id));
               break;
             case WebstratesErrorCodes.InternalServerError.code:
-              vscode.window.showErrorMessage(WebstratesErrorCodes.InternalServerError.errorTemplate());
+              thenable = vscode.window.showErrorMessage(WebstratesErrorCodes.InternalServerError.errorTemplate());
               break;
           }
         });
@@ -97,7 +92,11 @@ class WebstratesEditor {
   }
 
   /**
+   * Initialize editor commands.
    * 
+   * @private
+   * 
+   * @memberOf WebstratesEditor
    */
   private initCommands() {
     const initWorkspaceDisposable = vscode.commands.registerCommand('webstrates.initWorkspace', () => this.initWorkspace());
@@ -108,17 +107,34 @@ class WebstratesEditor {
   }
 
   /**
+   * Initialize editor events.
    * 
+   * @private
+   * 
+   * @memberOf WebstratesEditor
    */
   private initEvents() {
+
+    // On extension activate, also try to receive webstrate document of currently opened file document.
+    if (vscode.window.activeTextEditor) {
+      const document = vscode.window.activeTextEditor.document;
+      this.openDocumentWebstrate(document);
+    }
+
+    // Open webstrate document of any opened file document.
+    const openTextDocumentDisposable = vscode.workspace.onDidOpenTextDocument(this.openDocumentWebstrate);
     const saveDisposable = vscode.workspace.onDidSaveTextDocument((textDocument: vscode.TextDocument) => this.saveWebstrate(textDocument));
     const closeDisposable = vscode.workspace.onDidCloseTextDocument((textDocument: vscode.TextDocument) => this.closeWebstrate(textDocument));
 
-    this.context.subscriptions.push(saveDisposable, closeDisposable);
+    this.context.subscriptions.push(openTextDocumentDisposable, saveDisposable, closeDisposable);
   }
 
   /**
+   * Initialize preview window.
    * 
+   * @private
+   * 
+   * @memberOf WebstratesEditor
    */
   private initPreview() {
     this.previewUri = vscode.Uri.parse('webstrate-preview://authority/webstrate-preview');
@@ -147,11 +163,16 @@ class WebstratesEditor {
   }
 
   /**
+   * Initialize output channel and status bar. The output channel is mostly important for developing and debugging
+   * the extension, but could be useful at some point to report bugs. It will be hidden by default.
    * 
+   * @private
+   * 
+   * @memberOf WebstratesEditor
    */
   private initOutput() {
     // show 'Webstrates' output channel in UI
-    WebstratesEditor.OutputChannel.show();
+    // WebstratesEditor.OutputChannel.show();
 
     // Show 'Webstrates' status bar item in UI.
     WebstratesEditor.StatusBarItem.show();
@@ -161,7 +182,31 @@ class WebstratesEditor {
    * Initialize Webstrates workspace. 
    */
   private initWorkspace() {
-    WebstratesEditorUtils.initWorkspace();
+    Utils.initWorkspace();
+  }
+
+  /**
+   * 
+   * 
+   * @private
+   * @param {vscode.TextDocument} document
+   * @returns
+   * 
+   * @memberOf WebstratesEditor
+   */
+  private openDocumentWebstrate(document: vscode.TextDocument) {
+    let webstrateId = Utils.getWebstrateIdFromDocument(document);
+
+    if (!webstrateId) {
+      return;
+    }
+
+    let fileDocument = this.manager.getOpenFileDocument(document);
+    if (!fileDocument) {
+      console.warn(`webstrate not yet opened ${webstrateId}`);
+
+      this.openWebstrate(webstrateId, document);
+    }
   }
 
   /**
@@ -202,7 +247,7 @@ class WebstratesEditor {
   private closeWebstrate(textDocument) {
     // vscode.window.showInformationMessage('close text doc');
 
-    const config = WebstratesEditorUtils.loadWorkspaceConfig();
+    const config = Utils.loadWorkspaceConfig();
     // const deleteLocalFile = typeof config.deleteLocalFilesOnClose === "undefined" ? true : config.deleteLocalFilesOnClose;
     const deleteLocalFile = !!config.deleteLocalFilesOnClose;
 
@@ -254,7 +299,12 @@ class WebstratesEditor {
   }
 
   /**
-   * @param  {string} message
+   * Log messages to output channel.
+   * 
+   * @static
+   * @param {string} message The log message.
+   * 
+   * @memberOf WebstratesEditor
    */
   public static Log(message: string) {
     WebstratesEditor.OutputChannel.appendLine(message);
@@ -263,8 +313,21 @@ class WebstratesEditor {
   /**
    * @param  {string} status
    */
-  public static SetStatus(status: string, tooltip: string = null, color: string = null) {
-    WebstratesEditor.StatusBarItem.text = status;
+  public static SetStatus(status: string, spin: boolean = true, tooltip: string = null, color: string = null) {
+
+    if (WebstratesEditor.statusBarSpinnerInterval) {
+      clearInterval(WebstratesEditor.statusBarSpinnerInterval);
+    }
+
+    // if (spin) {
+      WebstratesEditor.statusBarSpinnerInterval = setInterval(function () {
+        let spinnerFrame = frame();
+        WebstratesEditor.StatusBarItem.text = `${spinnerFrame} ${status}`;
+      }, 100);
+    // }
+    // else {
+    //   WebstratesEditor.StatusBarItem.text = status;
+    // }
 
     if (tooltip) {
       WebstratesEditor.StatusBarItem.tooltip = tooltip;
@@ -296,7 +359,7 @@ class WebstratesEditor {
   public dispose() {
     if (this.manager) {
 
-      const config = WebstratesEditorUtils.loadWorkspaceConfig();
+      const config = Utils.loadWorkspaceConfig();
       // const deleteLocalFile = typeof config.deleteLocalFilesOnClose === "undefined" ? true : config.deleteLocalFilesOnClose;
       const deleteLocalFile = !!config.deleteLocalFilesOnClose;
 

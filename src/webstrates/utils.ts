@@ -19,7 +19,7 @@ const initialConfiguration = `{
     // timeout, or SSL enable/disabled.
 }`;
 
-const WebstratesEditorUtils = {
+const Utils = {
 
   webstratesConfigPath: '.webstrates',
   webstratesConfigFileName: 'config.json',
@@ -76,7 +76,18 @@ const WebstratesEditorUtils = {
     }
 
     return webstratesConfigFileAbsolute;
+  },
+
+  getWebstrateIdFromDocument(document: vscode.TextDocument) {
+    // Quick check for .webstrates configuration folder in workspace. This is not optimal
+    // since it could also be a webstrateId or it could be a subfolder.
+    // Ignore if it is the .webstrates configuration folder.
+    if (document.fileName.lastIndexOf('.webstrates') > -1) {
+      return null;
+    }
+
+    return path.posix.basename(document.fileName);
   }
 }
 
-export { WebstratesEditorUtils }
+export { Utils }

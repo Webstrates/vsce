@@ -4,21 +4,22 @@ const path = require('path');
 var elegantSpinner = require('elegant-spinner');
 var frame = elegantSpinner();
 
+import { WebstratesClient } from './webstrates-client';
 import { FileDocument } from './file-document';
 import { WebstratesErrorCodes } from './error-codes';
-import { WebstrateFilesManager } from './files-manager';
 import { Utils } from './utils';
 import { WebstratePreviewDocumentContentProvider } from './content-provider';
 
 class WebstratesEditor {
 
   private static OutputChannel: vscode.OutputChannel = vscode.window.createOutputChannel('Webstrates Editor');
-  private static StatusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 0);
+  private static StatusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 1);
+  private static ClientStatusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 2);
 
   private context: vscode.ExtensionContext;
-  private manager: WebstrateFilesManager;
+  private client: WebstratesClient;
   private previewUri: vscode.Uri;
-  private activeFileDocument: FileDocument;
+  // private activeFileDocument: FileDocument;
 
   // Spinner interval -> used in status bar to show a progressing spinner before message.
   private static statusBarSpinnerInterval: any;
@@ -30,7 +31,7 @@ class WebstratesEditor {
     this.context = context;
 
     // initialize Webstrates webstrate file manager
-    this.initFileManager();
+    this.initClient();
     this.initCommands();
     this.initEvents();
     this.initPreview();
@@ -47,44 +48,18 @@ class WebstratesEditor {
    * 
    * @memberOf WebstratesEditor
    */
-  private initFileManager() {
+  private initClient() {
     const config = Utils.loadWorkspaceConfig();
 
     if (config) {
-      const serverAddress = config.serverAddress;
-      if (serverAddress) {
-        this.manager = new WebstrateFilesManager(serverAddress);
-
-        this.manager.onDidDocumentConnect(({fileDocument}) => {
-          if (this.activeFileDocument === fileDocument) {
-            this.updateStatus();
-          }
-        });
-
-        this.manager.onDidDocumentDisconnect(({fileDocument}) => {
-          if (this.activeFileDocument === fileDocument) {
-            this.updateStatus();
-          }
-        });
-
-        this.manager.onDocumentError(({fileDocument, error}) => {
-
-          if (!error) {
-            vscode.window.showErrorMessage('Unknown Error');
-            return;
-          }
-
-          let thenable: Thenable<string> = null;
-          switch (error.code) {
-            case WebstratesErrorCodes.AccessForbidden.code:
-              thenable = vscode.window.showErrorMessage(WebstratesErrorCodes.AccessForbidden.errorTemplate(fileDocument.id));
-              break;
-            case WebstratesErrorCodes.WebstrateNotFound.code:
-              thenable = vscode.window.showWarningMessage(WebstratesErrorCodes.WebstrateNotFound.errorTemplate(fileDocument.id));
-              break;
-            case WebstratesErrorCodes.InternalServerError.code:
-              thenable = vscode.window.showErrorMessage(WebstratesErrorCodes.InternalServerError.errorTemplate());
-              break;
+      const hostname = config.serverAddress;
+      if (hostname) {
+        this.client = new WebstratesClient(hostname);
+        this.client.onDidConnect(() => {
+          // On extension activate, also try to receive webstrate document of currently opened file document.
+          if (vscode.window.activeTextEditor) {
+            const document = vscode.window.activeTextEditor.document;
+            this.openDocumentWebstrate(document);
           }
         });
       }
@@ -115,11 +90,11 @@ class WebstratesEditor {
    */
   private initEvents() {
 
-    // On extension activate, also try to receive webstrate document of currently opened file document.
-    if (vscode.window.activeTextEditor) {
-      const document = vscode.window.activeTextEditor.document;
-      this.openDocumentWebstrate(document);
-    }
+    // // On extension activate, also try to receive webstrate document of currently opened file document.
+    // if (vscode.window.activeTextEditor) {
+    //   const document = vscode.window.activeTextEditor.document;
+    //   this.openDocumentWebstrate(document);
+    // }
 
     // Open webstrate document of any opened file document.
     const openTextDocumentDisposable = vscode.workspace.onDidOpenTextDocument(this.openDocumentWebstrate);
@@ -141,25 +116,17 @@ class WebstratesEditor {
     let provider = new WebstratePreviewDocumentContentProvider();
     let registration = vscode.workspace.registerTextDocumentContentProvider('webstrate-preview', provider);
 
-    const onDidChangeTextDocumentDisposable = vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
+    const changeTextDocumentDisposable = vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
       if (e.document === vscode.window.activeTextEditor.document) {
         provider.update(this.previewUri);
       }
     });
 
-    const onChangeActiveTextEditorDisposable = vscode.window.onDidChangeActiveTextEditor((textEditor: vscode.TextEditor) => {
+    const changeActiveTextEditorDisposable = vscode.window.onDidChangeActiveTextEditor((textEditor: vscode.TextEditor) => {
       provider.update(this.previewUri);
-
-      const activeTextDocument = textEditor.document;
-      const fileDocument = this.manager.getOpenFileDocument(activeTextDocument);
-
-      if (fileDocument) {
-        this.activeFileDocument = fileDocument;
-        this.updateStatus();
-      }
     });
 
-    this.context.subscriptions.push(registration, onDidChangeTextDocumentDisposable, onChangeActiveTextEditorDisposable);
+    this.context.subscriptions.push(registration, changeTextDocumentDisposable, changeActiveTextEditorDisposable);
   }
 
   /**
@@ -176,6 +143,7 @@ class WebstratesEditor {
 
     // Show 'Webstrates' status bar item in UI.
     WebstratesEditor.StatusBarItem.show();
+    WebstratesEditor.ClientStatusBarItem.show();
   }
 
   /**
@@ -184,6 +152,13 @@ class WebstratesEditor {
   private initWorkspace() {
     Utils.initWorkspace();
   }
+
+  private onFileDocumentConnect: any;
+  private onFileDocumentDisconnect: any;
+  private onFileDocumentNew: any;
+  private onFileDocumentUpdate: any;
+  private onFileDocumentUpdateOp: any;
+  private onFileDocumentError: any;
 
   /**
    * 
@@ -194,19 +169,78 @@ class WebstratesEditor {
    * 
    * @memberOf WebstratesEditor
    */
-  private openDocumentWebstrate(document: vscode.TextDocument) {
-    let webstrateId = Utils.getWebstrateIdFromDocument(document);
+  private openDocumentWebstrate(textDocument: vscode.TextDocument) {
 
-    if (!webstrateId) {
-      return;
+    if (this.onFileDocumentConnect) {
+      this.onFileDocumentConnect.dispose();
     }
 
-    let fileDocument = this.manager.getOpenFileDocument(document);
-    if (!fileDocument) {
-      console.warn(`webstrate not yet opened ${webstrateId}`);
-
-      this.openWebstrate(webstrateId, document);
+    if (this.onFileDocumentDisconnect) {
+      this.onFileDocumentDisconnect.dispose();
     }
+
+    if (this.onFileDocumentNew) {
+      this.onFileDocumentNew.dispose();
+    }
+
+    if (this.onFileDocumentUpdate) {
+      this.onFileDocumentUpdate.dispose();
+    }
+
+    if (this.onFileDocumentUpdateOp) {
+      this.onFileDocumentUpdateOp.dispose();
+    }
+
+    if (this.onFileDocumentError) {
+      this.onFileDocumentError.dispose();
+    }
+
+    // TODO on data events to show active data transmission.
+
+    // Get webstrate file document, which relates to the text document.
+    this.client.getFileDocument(textDocument).then(fileDocument => {
+      this.onFileDocumentConnect = fileDocument.onDidConnect(() => {
+        WebstratesEditor.SetStatus('Sync', 1000); // Placeholder message
+      });
+
+      this.onFileDocumentDisconnect = fileDocument.onDidDisconnect(() => {
+        WebstratesEditor.SetStatus('Sync', -1); // Placeholder message
+      });
+
+      this.onFileDocumentNew = fileDocument.onNew(() => {
+        vscode.window.showWarningMessage(WebstratesErrorCodes.WebstrateNotFound.errorTemplate(fileDocument.id));
+      });
+
+      this.onFileDocumentUpdate = fileDocument.onUpdate(() => {
+        WebstratesEditor.SetStatus('Sync', 3000);
+      });
+
+      this.onFileDocumentUpdateOp = fileDocument.onUpdateOp(() => {
+        WebstratesEditor.SetStatus('Sync', 3000);
+      });
+
+      this.onFileDocumentError = fileDocument.onError(error => {
+        WebstratesEditor.SetStatus('Error'); // Placeholder message
+
+        if (!error) {
+          vscode.window.showErrorMessage('Unknown Error');
+          return;
+        }
+
+        let thenable: Thenable<string> = null;
+        switch (error.code) {
+          case WebstratesErrorCodes.AccessForbidden.code:
+            thenable = vscode.window.showErrorMessage(WebstratesErrorCodes.AccessForbidden.errorTemplate(fileDocument.id));
+            break;
+          case WebstratesErrorCodes.WebstrateNotFound.code:
+            thenable = vscode.window.showWarningMessage(WebstratesErrorCodes.WebstrateNotFound.errorTemplate(fileDocument.id));
+            break;
+          case WebstratesErrorCodes.InternalServerError.code:
+            thenable = vscode.window.showErrorMessage(WebstratesErrorCodes.InternalServerError.errorTemplate());
+            break;
+        }
+      });
+    });
   }
 
   /**
@@ -221,21 +255,27 @@ class WebstratesEditor {
     }
 
     if (!webstrateId) {
-      var inputPromise = this.webstrateIdInput();
-      inputPromise.then(webstrateId => {
+      this.webstrateIdInput()
+        .then(webstrateId => {
 
-        // webstrateId will be 'undefined' on cancel input
-        if (!webstrateId) {
-          return;
-        }
+          // webstrateId will be 'undefined' on cancel input
+          if (!webstrateId) {
+            return;
+          }
 
-        const filePath = path.join(workspacePath, `${webstrateId}`);
-        this.manager.requestWebstrate(webstrateId, filePath);
-      });
+          const filePath = path.join(workspacePath, `${webstrateId}`);
+
+          WebstratesEditor.SetStatus(`Requesting ${webstrateId}`);
+
+          this.client.requestWebstrate(webstrateId, filePath);
+        });
     }
     else {
       const filePath = document.fileName;
-      this.manager.requestWebstrate(webstrateId, filePath);
+
+      WebstratesEditor.SetStatus(`Requesting ${webstrateId}`);
+
+      this.client.requestWebstrate(webstrateId, filePath);
     }
   }
 
@@ -251,7 +291,7 @@ class WebstratesEditor {
     // const deleteLocalFile = typeof config.deleteLocalFilesOnClose === "undefined" ? true : config.deleteLocalFilesOnClose;
     const deleteLocalFile = !!config.deleteLocalFilesOnClose;
 
-    this.manager.closeWebstrate(textDocument, deleteLocalFile);
+    this.client.closeWebstrate(textDocument, deleteLocalFile);
   }
 
   /**
@@ -264,13 +304,15 @@ class WebstratesEditor {
 
     let textDocument = vscode.window.activeTextEditor.document;
 
-    let fileDocument = this.manager.getOpenFileDocument(textDocument);
-    let webstrateId = fileDocument.id;
+    this.client.getFileDocument(textDocument).then(fileDocument => {
 
-    return vscode.commands.executeCommand('vscode.previewHtml', uri, vscode.ViewColumn.Two, `Webstrate Preview`).then((success) => {
-    }, (reason) => {
-      vscode.window.showErrorMessage(reason);
     });
+
+    return vscode.commands.executeCommand('vscode.previewHtml', uri, vscode.ViewColumn.Two, `Webstrate Preview`)
+      .then(success => {
+      }, (reason) => {
+        vscode.window.showErrorMessage(reason);
+      });
   }
 
   /**
@@ -282,18 +324,18 @@ class WebstratesEditor {
     const webstratesConfigFile = path.join(workspacePath, '.webstrates', 'config.json');
 
     if (textDocument.fileName === webstratesConfigFile) {
-      this.initFileManager();
+      this.initClient();
     }
     else {
       // vscode.window.showInformationMessage('save text doc');
-      this.manager.saveWebstrate(textDocument);
+      this.client.saveWebstrate(textDocument);
     }
   }
 
   /**
    * 
    */
-  private webstrateIdInput() {
+  private webstrateIdInput(): Thenable<string> {
     let workspacePath = vscode.workspace.rootPath;
     return vscode.window.showInputBox({ prompt: 'webstrate id' });
   }
@@ -311,23 +353,59 @@ class WebstratesEditor {
   }
 
   /**
+   * tbd.
+   * 
+   * @static
+   * @param {string} status
+   * 
+   * @memberOf WebstratesEditor
+   */
+  public static SetClientStatus(status: string, countdownTime: number = 0) {
+    WebstratesEditor.ClientStatusBarItem.text = status;
+
+    const countdown = (seconds: Number) => {
+      if (countdownTime > 0) {
+        setTimeout(() => {
+          WebstratesEditor.ClientStatusBarItem.text = `${status}... ${countdownTime}`;
+          countdown(--countdownTime);
+        }, 1000);
+      }
+    }
+    countdown(countdownTime);
+  }
+
+  private static spinTimeoutHandle: any;
+
+  /**
    * @param  {string} status
    */
-  public static SetStatus(status: string, spin: boolean = true, tooltip: string = null, color: string = null) {
+  public static SetStatus(status: string, spinTimeout: Number = 0, tooltip: string = null, color: string = null) {
 
     if (WebstratesEditor.statusBarSpinnerInterval) {
       clearInterval(WebstratesEditor.statusBarSpinnerInterval);
+      WebstratesEditor.statusBarSpinnerInterval = undefined;
     }
 
-    // if (spin) {
-      WebstratesEditor.statusBarSpinnerInterval = setInterval(function () {
-        let spinnerFrame = frame();
-        WebstratesEditor.StatusBarItem.text = `${spinnerFrame} ${status}`;
-      }, 100);
-    // }
-    // else {
-    //   WebstratesEditor.StatusBarItem.text = status;
-    // }
+    if (WebstratesEditor.spinTimeoutHandle) {
+      clearTimeout(WebstratesEditor.spinTimeoutHandle);
+      WebstratesEditor.spinTimeoutHandle = undefined;
+    }
+
+    if (spinTimeout > 0) {
+      WebstratesEditor.spinTimeoutHandle = setTimeout(() => {
+        WebstratesEditor.spinTimeoutHandle = undefined;
+
+        clearInterval(WebstratesEditor.statusBarSpinnerInterval);
+        WebstratesEditor.statusBarSpinnerInterval = undefined;
+
+        WebstratesEditor.StatusBarItem.text = status;
+      }, spinTimeout);
+    }
+
+    WebstratesEditor.statusBarSpinnerInterval = setInterval(function () {
+      let spinnerFrame = frame();
+      WebstratesEditor.StatusBarItem.text = `${spinnerFrame} ${status}`;
+    }, 100);
 
     if (tooltip) {
       WebstratesEditor.StatusBarItem.tooltip = tooltip;
@@ -341,30 +419,15 @@ class WebstratesEditor {
   /**
    * 
    */
-  private updateStatus() {
-    if (!this.activeFileDocument) {
-      return;
-    }
-
-    const isConnected = this.activeFileDocument.isConnected;
-    const status = isConnected ? 'Connected' : 'Disconnected';
-    // const tooltip = `${this.activeFileDocument.hostAddress}`;
-
-    WebstratesEditor.SetStatus(status/*, tooltip*/);
-  }
-
-  /**
-   * 
-   */
   public dispose() {
-    if (this.manager) {
+    if (this.client) {
 
       const config = Utils.loadWorkspaceConfig();
       // const deleteLocalFile = typeof config.deleteLocalFilesOnClose === "undefined" ? true : config.deleteLocalFilesOnClose;
       const deleteLocalFile = !!config.deleteLocalFilesOnClose;
 
-      this.manager.dispose(deleteLocalFile);
-      this.manager = null;
+      this.client.dispose(deleteLocalFile);
+      this.client = null;
     }
   }
 }

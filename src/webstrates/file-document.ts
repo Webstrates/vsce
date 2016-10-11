@@ -24,19 +24,27 @@ class FileDocument {
   }
 
   onDidConnect(listener) {
-    return this.onEvent("connected", listener);
+    return this.document.onDidConnect(listener);
   }
 
   onDidDisconnect(listener) {
-    return this.onEvent("disconnected", listener);
+    return this.document.onDidDisconnect(listener);
   }
 
   onError(listener) {
-    return this.onEvent("error", listener);
+    return this.document.onError(listener);
   }
 
-  onData(listener) {
-    return this.onEvent("data", listener);
+  onNew(listener) {
+    return this.document.onNewDocument(listener);
+  }
+
+  onUpdate(listener) {
+    return this.document.onUpdate(listener);
+  }
+
+  onUpdateOp(listener) {
+    return this.document.onUpdateOp(listener);
   }
 
   get id() {
@@ -77,7 +85,12 @@ class FileDocument {
     WebstratesEditor.Log(`Closing webstrate '${this.id}'`);
 
     // Close connection to Webstrates server
-    this.document.close();
+    try {
+      this.document.close();
+    }
+    catch (error) {
+      WebstratesEditor.Log(`Error ${error}`);
+    }
 
     // delete local copy of file
     if (deleteLocalFile && fs.existsSync(this.filePath)) {
@@ -102,27 +115,10 @@ class FileDocument {
   private prepareDocument(document: any) {
     document.onDidConnect(() => {
       this.isConnected = true;
-      this.eventEmitter.emit("connected", {});
     });
 
     document.onDidDisconnect(() => {
       this.isConnected = false;
-      this.eventEmitter.emit("disconnected", {});
-    });
-
-    document.onNewDocument(() => {
-      this.eventEmitter.emit("error", {
-        code: 404,
-        reason: 'webstrate.not.found'
-      });
-    });
-
-    document.onError(event => {
-      this.eventEmitter.emit("error", {
-        code: 500,
-        reason: 'Internal server error. Please check debug output!'
-      });
-      WebstratesEditor.Log(`${event.message}: ${event.error} [jsonML=${event.jsonML}]`);
     });
 
     let timeout;

@@ -1,100 +1,91 @@
 {
-  "name": "webstrates-editor",
-  "displayName": "Webstrates Editor",
-  "description": "Editor that connects to Webstrates server to edit webstrates within Visual Studio Code.",
-  "icon": "images/webstrates-logo.png",
-  "version": "0.6.1",
-  "publisher": "raedle",
-  "license": "Apache-2.0",
-  "bugs": {
-    "url": "https://github.com/raedle/Webstrates-vscode-extension/issues",
-    "email": "roman.raedle@gmail.com"
-  },
-  "homepage": "https://github.com/raedle/Webstrates-vscode-extension/blob/master/README.md",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/raedle/Webstrates-vscode-extension.git"
-  },
-  "categories": [
-    "Other"
-  ],
-  "engines": {
-    "vscode": "^1.5.0"
-  },
-  "main": "./out/src/extension",
-  "activationEvents": [
-    "workspaceContains:.webstrates/config.json",
-    "onCommand:webstrates.initWorkspace"
-  ],
-  "contributes": {
-    "commands": [
-      {
-        "command": "webstrates.initWorkspace",
-        "title": "Init Webstrates Workspace"
-      },
-      {
-        "command": "webstrates.openWebstrate",
-        "title": "Open Webstrate"
-      },
-      {
-        "command": "webstrates.webstratePreview",
-        "title": "Webstrate Preview"
-      }
+    "name": "webstrates-editor",
+    "displayName": "Webstrates Editor",
+    "description": "Editor that connects to Webstrates server to edit webstrates within Visual Studio Code.",
+    "icon": "images/webstrates-logo.png",
+    "version": "0.7.0",
+    "publisher": "raedle",
+    "license": "Apache-2.0",
+    "bugs": {
+        "url": "https://github.com/raedle/Webstrates-vscode-extension/issues",
+        "email": "roman.raedle@gmail.com"
+    },
+    "homepage": "https://github.com/raedle/Webstrates-vscode-extension/blob/master/README.md",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/raedle/Webstrates-vscode-extension.git"
+    },
+    "categories": [
+        "Other"
     ],
-    "keybindings": [
-      {
-        "command": "webstrates.openWebstrate",
-        "key": "ctrl+alt+o",
-        "mac": "cmd+alt+o"
-      },
-      {
-        "command": "webstrates.webstratePreview",
-        "key": "ctrl+alt+p",
-        "mac": "cmd+alt+p"
-      }
+    "engines": {
+        "vscode": "^1.5.0"
+    },
+    "main": "./out/src/extension",
+    "activationEvents": [
+        "workspaceContains:.webstrates/config.json",
+        "onCommand:webstrates.initWorkspace"
     ],
-    "languages": [
-      {
-        "id": "html",
-        "firstLine": ".*<html.*"
-      },
-      {
-        "id": "js",
-        "extensions": [
-          ".js"
+    "contributes": {
+        "commands": [
+            {
+                "command": "webstrates.initWorkspace",
+                "title": "Init Webstrates Workspace"
+            },
+            {
+                "command": "webstrates.webstratePreview",
+                "title": "Webstrate Preview"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "webstrates.webstratePreview",
+                "key": "ctrl+alt+p",
+                "mac": "cmd+alt+p"
+            }
+        ],
+        "languages": [
+            {
+                "id": "html",
+                "firstLine": ".*<html.*"
+            },
+            {
+                "id": "js",
+                "extensions": [
+                    ".js"
+                ]
+            },
+            {
+                "id": "css",
+                "extensions": [
+                    ".css"
+                ]
+            }
         ]
-      },
-      {
-        "id": "css",
-        "extensions": [
-          ".css"
-        ]
-      }
-    ]
-  },
-  "scripts": {
-    "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
-    "compile": "node ./node_modules/vscode/bin/compile -watch -p ./",
-    "postinstall": "node ./node_modules/vscode/bin/install"
-  },
-  "dependencies": {
-    "cheerio": "^0.20.0",
-    "chokidar": "^1.6.0",
-    "elegant-spinner": "^1.0.1",
-    "event-emitter": "^0.3.4",
-    "json-comments": "^0.2.1",
-    "json0-ot-diff": "^1.0.1",
-    "jsonml-parse": "git+https://github.com/kbadk/jsonml-parse#master",
-    "jsonml-tools": "git+http://github.com/cklokmose/jsonml-tools.git#master",
-    "moment": "^2.15.1",
-    "optimist": "^0.6.1",
-    "sharedb": "^0.11.37",
-    "websocket": "^1.0.23",
-    "webstrates": "^0.2.2"
-  },
-  "devDependencies": {
-    "eslint": "^3.7.1",
-    "typescript": "^1.8.5",
-    "vscode": "^0.11.0"
-  }
+    },
+    "scripts": {
+        "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
+        "compile": "node ./node_modules/vscode/bin/compile -watch -p ./",
+        "postinstall": "node ./node_modules/vscode/bin/install"
+    },
+    "dependencies": {
+        "cheerio": "^0.20.0",
+        "chokidar": "^1.6.0",
+        "elegant-spinner": "^1.0.1",
+        "event-emitter": "^0.3.4",
+        "json-comments": "^0.2.1",
+        "json0-ot-diff": "^1.0.1",
+        "jsonml-parse": "git+https://github.com/kbadk/jsonml-parse#master",
+        "jsonml-tools": "git+http://github.com/cklokmose/jsonml-tools.git#master",
+        "moment": "^2.15.1",
+        "optimist": "^0.6.1",
+        "sharedb": "^0.11.37",
+        "websocket": "^1.0.23",
+        "webstrates": "^0.2.2"
+    },
+    "devDependencies": {
+        "eslint": "^3.7.1",
+        "typescript": "^1.8.5",
+        "vscode": "^0.11.0"
+    }
 }

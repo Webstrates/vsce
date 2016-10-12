@@ -1,5 +1,9 @@
 # Webstrates Editor
 
+**NOTE: The explicit command to open a webstrate (`cmd+alt+o` on OSX or `ctrl+alt+o` on Windows and Linux) has
+been removed as the extension uses filenames to derive the webstrate id. Add files in the filesystem to link them
+to a particular webstrate. The file's name defines the webstrate id.**
+
 ## Features
 
 The Webstrates Editor allows synchronized editing of webstrates in Visual Studio Code (vscode).
@@ -12,10 +16,12 @@ The Webstrates Editor allows synchronized editing of webstrates in Visual Studio
 
 * Initialize Webstrate Editor workspace
   1. Open or create workspace folder
-  2. Open command palette (`cmd+shift+p` on OSX or `ctrl+shift+o` on Windows and Linux)
+  2. Open command palette (`cmd+shift+p` on OSX or `ctrl+shift+p` on Windows and Linux)
   3. Search for `Init Webstrates Workspace` and hit enter
   4. Change `"serverAddress"` property in `config.json` to match your Webstrates' server address
-* Open Webstrate (`cmd+alt+o` on OSX or `ctrl+alt+o` on Windows and Linux)
+* To open a webstrate add new file in Visual Studio Code or open an existing file. The filename will be used as
+webstrate id. It is possible to make use of the hierarchical file system to structure webstrates in folders as the
+extension ignores folders and only uses the actual filename as webstrate id.
 * Save Webstrate (`cmd+s` on OSX or `ctrl+s` on Windows and Linux)
 * Webstate Preview (`cmd+alt+p` on OSX or `ctrl+alt+p` on Windows and Linux) 
 

@@ -33,57 +33,11 @@ export default class WebstratesClient {
   }
 
   /**
-   * 
-   * 
-   * @param {String} webstrateId
-   * @param {string} filePath
-   * @returns {Thenable<FileDocument>}
-   * 
-   * @memberOf WebstrateFilesManager
-   */
-  public requestWebstrate(webstrateId: String, filePath: string): Thenable<FileDocument> {
-
-    return new Promise((resolve, reject) => {
-
-      WebstratesClient.Log.debug(`Requesting webstrate '${webstrateId}' to ${filePath}`);
-
-      // add WebstrateFile to currently open files
-      // this is required to close connection workspace.onDidCloseTextDocument
-      const fileDocument = this.openDocumentAsFile(webstrateId, filePath);
-      fileDocument.onDidConnect(() => {
-        WebstratesClient.Log.debug(`Loaded webstrate '${webstrateId}'`);
-      });
-
-      fileDocument.onDidDisconnect(() => {
-        WebstratesClient.Log.debug(`Disconnected webstrate '${webstrateId}'`);
-      });
-
-      fileDocument.onUpdate(() => {
-        vscode.workspace.openTextDocument(filePath).then(doc => {
-
-          // associate text document with webstrate file
-          this.documentsToWebstrates.add(doc, fileDocument);
-
-          vscode.window.showTextDocument(doc).then(editor => {
-            // editor.setDecorations()
-            // WebstrateFileManager.Log(`language id ${doc.languageId}`);
-          });
-        });
-
-        resolve(fileDocument);
-      });
-
-      fileDocument.connect();
-    });
-  }
-
-  /**
    * @param  {vscode.TextDocument} textDocument
    */
   public saveWebstrate(textDocument: vscode.TextDocument) {
-    this.getFileDocument(textDocument).then(fileDocument => {
-      fileDocument.save(textDocument.getText());
-    });
+    const fileDocument = this.getFileDocument(textDocument);
+    fileDocument.save();
   }
 
   /**
@@ -91,12 +45,8 @@ export default class WebstratesClient {
    */
   public closeWebstrate(textDocument: vscode.TextDocument, deleteLocalFile: boolean = true) {
 
-    const webstrate = this.getFileDocument(textDocument)
-      .then(fileDocument => {
-        fileDocument.close(deleteLocalFile);
-      }, error => {
-        console.error(`error ${error}`);
-      });
+    const fileDocument = this.getFileDocument(textDocument);
+    fileDocument.close(deleteLocalFile);
 
     // remove webstrate from open webstrates
     this.documentsToWebstrates.remove(textDocument);
@@ -105,30 +55,24 @@ export default class WebstratesClient {
   /**
    * @param  {vscode.TextDocument} textDocument
    */
-  public getFileDocument(textDocument: vscode.TextDocument): Thenable<FileDocument> {
+  public getFileDocument(textDocument: vscode.TextDocument): FileDocument {
 
     // find webstrate file associated with the same text document
-    return new Promise<FileDocument>((resolve, reject) => {
-      let document = this.documentsToWebstrates.get(textDocument);
+    let fileDocument = this.documentsToWebstrates.get(textDocument);
 
-      if (document) {
-        resolve(document);
+    if (!fileDocument) {
+      let webstrateId = Utils.getWebstrateIdFromDocument(textDocument);
+
+      if (!webstrateId) {
+        WebstratesClient.Log.debug(`Could not resolve webstrate id from text document ${textDocument.fileName}.`);
+        return null;
       }
-      else {
-        let webstrateId = Utils.getWebstrateIdFromDocument(textDocument);
 
-        let workspacePath = vscode.workspace.rootPath;
-        if (!workspacePath) {
-          vscode.window.showInformationMessage('Open workspace first.');
-          return;
-        }
-        const filePath = path.join(workspacePath, `${webstrateId}`);
+      fileDocument = this.requestWebstrate(webstrateId, textDocument);
+      this.documentsToWebstrates.add(textDocument, fileDocument);
+    }
 
-        this.requestWebstrate(webstrateId, filePath).then(fileDocument => {
-          resolve(fileDocument);
-        });
-      }
-    });
+    return fileDocument;
   }
 
   /**
@@ -161,9 +105,9 @@ export default class WebstratesClient {
    * @param  {String} webstrateId Webstrate document id.
    * @param  {string} filePath Path to file to store webstrate document content.
    */
-  private openDocumentAsFile(webstrateId: String, filePath: string) {
+  private openDocumentAsFile(webstrateId: String, textDocument: vscode.TextDocument) {
     const document = this.client.openDocument(webstrateId, false);
-    return new FileDocument(document, filePath);
+    return new FileDocument(document, textDocument);
   }
 
   /**
@@ -192,6 +136,35 @@ export default class WebstratesClient {
       {
         maxReceivedFrameSize: 1024 * 1024 * 20 // 20 MB
       });
+  }
+
+  /**
+   * 
+   * 
+   * @private
+   * @param {String} webstrateId
+   * @param {vscode.TextDocument} textDocument
+   * @returns {Thenable<FileDocument>}
+   * 
+   * @memberOf WebstratesClient
+   */
+  private requestWebstrate(webstrateId: String, textDocument: vscode.TextDocument): FileDocument {
+
+    WebstratesClient.Log.debug(`Requesting webstrate ${webstrateId} and saving to ${textDocument.fileName}`);
+
+    // add WebstrateFile to currently open files
+    // this is required to close connection workspace.onDidCloseTextDocument
+    const fileDocument = this.openDocumentAsFile(webstrateId, textDocument);
+    fileDocument.onDidConnect(() => {
+      WebstratesClient.Log.debug(`Loaded webstrate '${webstrateId}'`);
+    });
+
+    fileDocument.onDidDisconnect(() => {
+      WebstratesClient.Log.debug(`Disconnected from webstrate '${webstrateId}'`);
+    });
+    fileDocument.connect();
+
+    return fileDocument;
   }
 
   /**

@@ -44,6 +44,13 @@ const Utils = {
     });
   },
 
+  isWorkspaceConfig(textDocument: vscode.TextDocument) {
+    const workspacePath = vscode.workspace.rootPath;
+    const webstratesConfigFile = path.join(workspacePath, Utils.webstratesConfigPath, Utils.webstratesConfigFileName);
+
+    return (textDocument.fileName === webstratesConfigFile);
+  },
+
   loadWorkspaceConfig() {
     const rootPath = vscode.workspace.rootPath;
     const webstratesConfigFileAbsolute = path.join(rootPath, this.webstratesConfigPath, this.webstratesConfigFileName);

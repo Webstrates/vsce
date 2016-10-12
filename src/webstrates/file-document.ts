@@ -1,6 +1,8 @@
 const fs = require("fs");
 const cheerio = require("cheerio");
 
+import * as vscode from 'vscode';
+
 import Logger from '../utils/logger';
 
 export default class FileDocument {
@@ -9,16 +11,16 @@ export default class FileDocument {
   private static Log: Logger = Logger.getLogger(FileDocument);
 
   private document: any;
-  private filePath: string;
+  private textDocument: vscode.TextDocument;
   private oldHtml: String;
   private $: any;
 
   // File connected to webstrate document
   public isConnected: Boolean = false;
 
-  constructor(document: any, filePath: string) {
+  constructor(document: any, textDocument: vscode.TextDocument) {
     this.document = document;
-    this.filePath = filePath;
+    this.textDocument = textDocument;
 
     this.prepareDocument(document);
   }
@@ -55,11 +57,14 @@ export default class FileDocument {
     this.document.connect();
   }
 
-  save(newHtml: string) {
+  save() {
+
     FileDocument.Log.debug(`Saving webstrate '${this.id}'`);
 
-    const that = this;
+    // Get file content as new webstrate content.
+    let newHtml = this.textDocument.getText();
 
+    // Eventually use this.textDocument.isDirty instead of checking for newHtml === this.oldHtml
     if (newHtml === this.oldHtml) {
       return;
     }
@@ -89,12 +94,12 @@ export default class FileDocument {
       this.document.close();
     }
     catch (error) {
-      FileDocument.Log.debug(`Error ${error}`);
+      FileDocument.Log.error(`Could not close webstrate document.`, error);
     }
 
     // delete local copy of file
-    if (deleteLocalFile && fs.existsSync(this.filePath)) {
-      fs.unlinkSync(this.filePath);
+    if (deleteLocalFile && fs.existsSync(this.textDocument.fileName)) {
+      fs.unlinkSync(this.textDocument.fileName);
     }
   }
 
@@ -137,6 +142,6 @@ export default class FileDocument {
       html = $webstrateContent.length ? $webstrateContent.text() : "";
     }
     this.oldHtml = html;
-    fs.writeFileSync(this.filePath, html);
+    fs.writeFileSync(this.textDocument.fileName, html);
   }
 }

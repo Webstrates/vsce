@@ -26,7 +26,7 @@ export default class Logger {
   public error(message: string, error: any = null) {
     message = `${message}
     ${error}`;
-    
+
     this.log("ERROR", message);
   }
 
@@ -36,6 +36,6 @@ export default class Logger {
 
   private log(logType: string, message: string) {
     const timestamp = moment().format("MM/DD/YYYY HH:mm:ss.SSS");
-    Logger.logOutput.appendLine(`${timestamp} [${logType}] [${this.classFunction.name}]\t${message}`);
+    Logger.logOutput.appendLine(`[${timestamp}] [${logType}] [${this.classFunction.name}]\t${message}`);
   }
 }

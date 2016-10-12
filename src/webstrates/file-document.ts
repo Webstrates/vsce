@@ -1,9 +1,12 @@
 const fs = require("fs");
 const cheerio = require("cheerio");
 
-import { WebstratesEditor } from './editor';
+import Logger from '../utils/logger';
 
-class FileDocument {
+export default class FileDocument {
+
+  // Logger to log info, debug, error, and warn messages.
+  private static Log: Logger = Logger.getLogger(FileDocument);
 
   private document: any;
   private filePath: string;
@@ -53,7 +56,7 @@ class FileDocument {
   }
 
   save(newHtml: string) {
-    WebstratesEditor.Log(`Saving webstrate '${this.id}'`);
+    FileDocument.Log.debug(`Saving webstrate '${this.id}'`);
 
     const that = this;
 
@@ -79,14 +82,14 @@ class FileDocument {
   }
 
   close(deleteLocalFile: boolean = true) {
-    WebstratesEditor.Log(`Closing webstrate '${this.id}'`);
+    FileDocument.Log.debug(`Closing webstrate '${this.id}'`);
 
     // Close connection to Webstrates server
     try {
       this.document.close();
     }
     catch (error) {
-      WebstratesEditor.Log(`Error ${error}`);
+      FileDocument.Log.debug(`Error ${error}`);
     }
 
     // delete local copy of file
@@ -137,5 +140,3 @@ class FileDocument {
     fs.writeFileSync(this.filePath, html);
   }
 }
-
-export { FileDocument };

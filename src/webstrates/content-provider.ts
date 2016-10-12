@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 const cheerio = require('cheerio');
 
-class WebstratePreviewDocumentContentProvider implements vscode.TextDocumentContentProvider {
+export default class WebstratePreviewDocumentContentProvider implements vscode.TextDocumentContentProvider {
 
     /**
      * Reset preview browser style to match Webkit default style.
@@ -83,5 +83,3 @@ class WebstratePreviewDocumentContentProvider implements vscode.TextDocumentCont
         return $.html();
     }
 }
-
-export { WebstratePreviewDocumentContentProvider };

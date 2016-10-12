@@ -1,46 +1,35 @@
 const W3CWebSocket = require('websocket').w3cwebsocket;
 const fs = require("fs");
 const path = require("path");
-const ee = require("event-emitter");
 const Client = require('webstrates').Client;
 
 import * as vscode from 'vscode';
 
-import { WebstratesEditor } from './editor';
-import { FileDocument } from './file-document';
+import WebstratesEditor from './editor';
+import FileDocument from './file-document';
+import Logger from '../utils/logger';
 import { Utils } from './utils';
 import { Dictionary } from '../collections';
 
-class WebstratesClient {
+export default class WebstratesClient {
+
+  // Logger to log info, debug, error, and warn messages.
+  private static Log: Logger = Logger.getLogger(WebstratesClient);
 
   private client: any;
   private documentsToWebstrates: Dictionary<vscode.TextDocument, FileDocument>;
-  private emitter: any;
 
   constructor(hostname: string, port: number = -1) {
-    this.emitter = ee({});
     this.documentsToWebstrates = new Dictionary<vscode.TextDocument, FileDocument>();
     this.connect(hostname, port);
   }
 
   onDidConnect(listener) {
-    this.emitter.on("connected", listener);
-
-    return {
-      dispose: () => {
-        this.emitter.off("connected", listener);
-      }
-    }
+    return this.client.onDidConnect(listener);
   }
 
   onDidDisconnect(listener) {
-    this.emitter.on("disconnected", listener);
-
-    return {
-      dispose: () => {
-        this.emitter.off("disconnected", listener);
-      }
-    }
+    return this.client.onDidDisconnect(listener);
   }
 
   /**
@@ -56,17 +45,17 @@ class WebstratesClient {
 
     return new Promise((resolve, reject) => {
 
-      WebstratesEditor.Log(`Requesting webstrate '${webstrateId}' to ${filePath}`);
+      WebstratesClient.Log.debug(`Requesting webstrate '${webstrateId}' to ${filePath}`);
 
       // add WebstrateFile to currently open files
       // this is required to close connection workspace.onDidCloseTextDocument
       const fileDocument = this.openDocumentAsFile(webstrateId, filePath);
       fileDocument.onDidConnect(() => {
-        WebstratesEditor.Log(`Loaded webstrate '${webstrateId}'`);
+        WebstratesClient.Log.debug(`Loaded webstrate '${webstrateId}'`);
       });
 
       fileDocument.onDidDisconnect(() => {
-        WebstratesEditor.Log(`Disconnected webstrate '${webstrateId}'`);
+        WebstratesClient.Log.debug(`Disconnected webstrate '${webstrateId}'`);
       });
 
       fileDocument.onUpdate(() => {
@@ -143,17 +132,6 @@ class WebstratesClient {
   }
 
   /**
-   * Open a webstrate as file and using the client to connect to the Webstrates server.
-   * 
-   * @param  {String} webstrateId Webstrate document id.
-   * @param  {string} filePath Path to file to store webstrate document content.
-   */
-  private openDocumentAsFile(webstrateId: String, filePath: string) {
-    const document = this.client.openDocument(webstrateId, false);
-    return new FileDocument(document, filePath);
-  }
-
-  /**
    * Connect client to Webstrates server.
    * 
    * @private
@@ -175,27 +153,17 @@ class WebstratesClient {
 
     // Create Webstrates client
     this.client = new Client(websocket);
-    this.client.onDidConnect(() => {
-      WebstratesEditor.SetClientStatus(`Connected to ${hostname}`);
-      this.emitter.emit("connected", {});
-    });
-    this.client.onDidDisconnect(() => {
-      WebstratesEditor.SetClientStatus(`Disconnected from ${hostname}`);
+  }
 
-      this.dispose(false);
-      this.emitter.emit("disconnected", {});
-
-      const config = Utils.loadWorkspaceConfig();
-
-      if (config.reconnect) {
-        WebstratesEditor.SetClientStatus(`Reconnecting`, config.reconnectTimeout / 1000);
-
-        // Try to reconnect after 10s timeout.
-        setTimeout(() => {
-          this.connect(hostname, port);
-        }, config.reconnectTimeout);
-      }
-    });
+  /**
+   * Open a webstrate as file and using the client to connect to the Webstrates server.
+   * 
+   * @param  {String} webstrateId Webstrate document id.
+   * @param  {string} filePath Path to file to store webstrate document content.
+   */
+  private openDocumentAsFile(webstrateId: String, filePath: string) {
+    const document = this.client.openDocument(webstrateId, false);
+    return new FileDocument(document, filePath);
   }
 
   /**
@@ -236,5 +204,3 @@ class WebstratesClient {
     this.documentsToWebstrates.clear();
   }
 }
-
-export { WebstratesClient };

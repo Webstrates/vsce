@@ -4,16 +4,19 @@ const path = require('path');
 var elegantSpinner = require('elegant-spinner');
 var frame = elegantSpinner();
 
+import Logger from '../utils/logger';
 import Timer from '../utils/timer';
-import { WebstratesClient } from './webstrates-client';
-import { FileDocument } from './file-document';
+import WebstratesClient from './webstrates-client';
+import FileDocument from './file-document';
+import WebstratePreviewDocumentContentProvider from './content-provider';
 import { WebstratesErrorCodes } from './error-codes';
 import { Utils } from './utils';
-import { WebstratePreviewDocumentContentProvider } from './content-provider';
 
-class WebstratesEditor {
+export default class WebstratesEditor {
 
-  private static OutputChannel: vscode.OutputChannel = vscode.window.createOutputChannel('Webstrates Editor');
+  // Logger to log info, debug, error, and warn messages.
+  private static Log: Logger = Logger.getLogger(WebstratesEditor);
+
   private static StatusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 1);
   private static ClientStatusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 2);
 
@@ -33,8 +36,9 @@ class WebstratesEditor {
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
 
-    // initialize Webstrates webstrate file manager
-    this.initClient();
+    // Connect to Webstrates server.
+    this.connectToServer();
+
     this.initCommands();
     this.initEvents();
     this.initPreview();
@@ -45,28 +49,49 @@ class WebstratesEditor {
   }
 
   /**
-   * Initialize file manager.
+   * Connect to Webstrates server.
    * 
    * @private
    * 
    * @memberOf WebstratesEditor
    */
-  private initClient() {
-    const config = Utils.loadWorkspaceConfig();
+  private connectToServer() {
 
-    if (config) {
-      const hostname = config.serverAddress;
-      if (hostname) {
-        this.client = new WebstratesClient(hostname);
-        this.client.onDidConnect(() => {
-          // On extension activate, also try to receive webstrate document of currently opened file document.
-          if (vscode.window.activeTextEditor) {
-            const document = vscode.window.activeTextEditor.document;
-            this.openDocumentWebstrate(document);
-          }
-        });
-      }
+    const { serverAddress, reconnect, reconnectTimeout, deleteLocalFilesOnClose } = Utils.loadWorkspaceConfig();
+
+    // Close existing connection to server.
+    if (this.client) {
+      this.client.dispose(deleteLocalFilesOnClose)
     }
+
+    this.client = new WebstratesClient(serverAddress);
+
+    this.client.onDidConnect(() => {
+      WebstratesEditor.SetClientStatus(`Connected to ${serverAddress}`);
+
+      // On extension activate, also try to receive webstrate document of currently opened file document.
+      if (vscode.window.activeTextEditor) {
+        const document = vscode.window.activeTextEditor.document;
+        this.openDocumentWebstrate(document);
+      }
+    });
+
+    this.client.onDidDisconnect(() => {
+      WebstratesEditor.SetClientStatus(`Disconnected from ${serverAddress}`);
+
+      this.client.dispose(deleteLocalFilesOnClose);
+
+      if (reconnect) {
+        WebstratesEditor.SetClientStatus(`Reconnecting`, reconnectTimeout / 1000);
+
+        // Try to reconnect after 10s timeout.
+        const timer = new Timer(reconnectTimeout);
+        timer.onElapsed(() => {
+          this.connectToServer();
+        });
+        timer.start();
+      }
+    });
   }
 
   /**
@@ -303,7 +328,7 @@ class WebstratesEditor {
   private webstratePreview() {
     // let uri = vscode.window.activeTextEditor.document.uri;
     let uri = this.previewUri;
-    WebstratesEditor.Log('Preview Uri ' + uri);
+    WebstratesEditor.Log.debug('Preview Uri ' + uri);
 
     let textDocument = vscode.window.activeTextEditor.document;
 
@@ -327,7 +352,7 @@ class WebstratesEditor {
     const webstratesConfigFile = path.join(workspacePath, '.webstrates', 'config.json');
 
     if (textDocument.fileName === webstratesConfigFile) {
-      this.initClient();
+      this.connectToServer();
     }
     else {
       // vscode.window.showInformationMessage('save text doc');
@@ -341,18 +366,6 @@ class WebstratesEditor {
   private webstrateIdInput(): Thenable<string> {
     let workspacePath = vscode.workspace.rootPath;
     return vscode.window.showInputBox({ prompt: 'webstrate id' });
-  }
-
-  /**
-   * Log messages to output channel.
-   * 
-   * @static
-   * @param {string} message The log message.
-   * 
-   * @memberOf WebstratesEditor
-   */
-  public static Log(message: string) {
-    WebstratesEditor.OutputChannel.appendLine(message);
   }
 
   /**
@@ -431,5 +444,3 @@ class WebstratesEditor {
     }
   }
 }
-
-export { WebstratesEditor }

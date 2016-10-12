@@ -39,6 +39,11 @@ export default class WebstratesEditor {
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
 
+    // Configure workspace.
+    if (!Utils.isWorkspaceConfigured()) {
+      Utils.initWorkspace();
+    }
+
     // Connect to Webstrates server.
     this.connectToServer();
 
@@ -113,7 +118,7 @@ export default class WebstratesEditor {
    * @memberOf WebstratesEditor
    */
   private initCommands() {
-    const initWorkspaceDisposable = vscode.commands.registerCommand('webstrates.initWorkspace', () => this.initWorkspace());
+    const initWorkspaceDisposable = vscode.commands.registerCommand('webstrates.initWorkspace', () => Utils.initWorkspace());
     const webstratePreviewDisposable = vscode.commands.registerCommand('webstrates.webstratePreview', () => this.webstratePreview());
 
     this.context.subscriptions.push(initWorkspaceDisposable, webstratePreviewDisposable);
@@ -188,13 +193,6 @@ export default class WebstratesEditor {
     // Show 'Webstrates' status bar item in UI.
     WebstratesEditor.StatusBarItem.show();
     WebstratesEditor.ClientStatusBarItem.show();
-  }
-
-  /**
-   * Initialize Webstrates workspace. 
-   */
-  private initWorkspace() {
-    Utils.initWorkspace();
   }
 
   private onFileDocumentConnect: any;

@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 
 const initialConfiguration = `{
     // DNS or IP address to connect to Webstrates server.
-    "serverAddress": "ws://localhost:7007",
+    "serverAddress": "ws://webstrate.cs.au.dk",
 
     "reconnect": true,
 
@@ -28,14 +28,7 @@ const Utils = {
    * Init Webstrates workspace.
    */
   initWorkspace() {
-    const workspacePath = vscode.workspace.rootPath;
-
-    if (!workspacePath) {
-      vscode.window.showErrorMessage('No workspace open.');
-      return;
-    }
-
-    const configFile = this.checkWorkspaceConfiguration(workspacePath);
+    const configFile = this.createDefaultWorkspaceConfig();
 
     // open configuration immediately to give any kind of user feedback on
     // the init workspace command
@@ -66,21 +59,46 @@ const Utils = {
 
   /**
    * 
+   * 
+   * @returns {boolean}
    */
-  checkWorkspaceConfiguration(rootPath: string) {
-    // console.log('check workspace config ' + rootPath);
+  isWorkspaceConfigured(): boolean {
+    const workspacePath = vscode.workspace.rootPath;
 
-    const webstratesConfigPathAbsolute = path.join(rootPath, this.webstratesConfigPath);
+    if (!workspacePath) {
+      vscode.window.showErrorMessage('No workspace open.');
+      return false;
+    }
+
+    const webstratesConfigPathAbsolute = path.join(workspacePath, this.webstratesConfigPath);
+    let exists = fs.existsSync(webstratesConfigPathAbsolute);
+    if (!exists) {
+      return false;
+    }
+
+    const webstratesConfigFileAbsolute = path.join(webstratesConfigPathAbsolute, this.webstratesConfigFileName);
+    return fs.existsSync(webstratesConfigFileAbsolute);
+  },
+
+  /**
+   * 
+   */
+  createDefaultWorkspaceConfig() {
+    const workspacePath = vscode.workspace.rootPath;
+
+    if (!workspacePath) {
+      vscode.window.showErrorMessage('No workspace open.');
+      return;
+    }
+
+    const webstratesConfigPathAbsolute = path.join(workspacePath, this.webstratesConfigPath);
     let exists = fs.existsSync(webstratesConfigPathAbsolute);
     if (!exists) {
       fs.mkdirSync(webstratesConfigPathAbsolute);
     }
 
     const webstratesConfigFileAbsolute = path.join(webstratesConfigPathAbsolute, this.webstratesConfigFileName);
-    exists = fs.existsSync(webstratesConfigFileAbsolute);
-    if (!exists) {
-      fs.writeFileSync(webstratesConfigFileAbsolute, initialConfiguration);
-    }
+    fs.writeFileSync(webstratesConfigFileAbsolute, initialConfiguration);
 
     return webstratesConfigFileAbsolute;
   },

@@ -3,7 +3,7 @@
     "displayName": "Webstrates Editor",
     "description": "Editor that connects to Webstrates server to edit webstrates within Visual Studio Code.",
     "icon": "images/webstrates-logo.png",
-    "version": "0.7.0",
+    "version": "0.7.1",
     "publisher": "raedle",
     "license": "Apache-2.0",
     "bugs": {

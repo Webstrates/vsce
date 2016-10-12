@@ -1,12 +1,10 @@
 const fs = require("fs");
-const ee = require('event-emitter');
 const cheerio = require("cheerio");
 
 import { WebstratesEditor } from './editor';
 
 class FileDocument {
 
-  private eventEmitter: any;
   private document: any;
   private filePath: string;
   private oldHtml: String;
@@ -16,7 +14,6 @@ class FileDocument {
   public isConnected: Boolean = false;
 
   constructor(document: any, filePath: string) {
-    this.eventEmitter = ee({});
     this.document = document;
     this.filePath = filePath;
 
@@ -102,16 +99,6 @@ class FileDocument {
     throw new Error(`delete webstrate document not yet implemented`);
   }
 
-  private onEvent(eventName: string, listener: any) {
-    this.eventEmitter.on(eventName, listener);
-
-    return {
-      dispose() {
-        this.emitter.off(eventName, listener);
-      }
-    }
-  }
-
   private prepareDocument(document: any) {
     document.onDidConnect(() => {
       this.isConnected = true;
@@ -136,7 +123,6 @@ class FileDocument {
 
     document.onUpdate(html => {
       this.writeToFile(html);
-      this.eventEmitter.emit("data", {});
     });
   }
 

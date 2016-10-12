@@ -4,6 +4,7 @@ const path = require('path');
 var elegantSpinner = require('elegant-spinner');
 var frame = elegantSpinner();
 
+import Timer from '../utils/timer';
 import { WebstratesClient } from './webstrates-client';
 import { FileDocument } from './file-document';
 import { WebstratesErrorCodes } from './error-codes';
@@ -19,7 +20,9 @@ class WebstratesEditor {
   private context: vscode.ExtensionContext;
   private client: WebstratesClient;
   private previewUri: vscode.Uri;
-  // private activeFileDocument: FileDocument;
+
+  private static timer: Timer;
+  private static spinnerTimer: Timer;
 
   // Spinner interval -> used in status bar to show a progressing spinner before message.
   private static statusBarSpinnerInterval: any;
@@ -97,7 +100,7 @@ class WebstratesEditor {
     // }
 
     // Open webstrate document of any opened file document.
-    const openTextDocumentDisposable = vscode.workspace.onDidOpenTextDocument(this.openDocumentWebstrate);
+    const openTextDocumentDisposable = vscode.workspace.onDidOpenTextDocument((textDocument: vscode.TextDocument) => this.openDocumentWebstrate(textDocument));
     const saveDisposable = vscode.workspace.onDidSaveTextDocument((textDocument: vscode.TextDocument) => this.saveWebstrate(textDocument));
     const closeDisposable = vscode.workspace.onDidCloseTextDocument((textDocument: vscode.TextDocument) => this.closeWebstrate(textDocument));
 
@@ -361,59 +364,56 @@ class WebstratesEditor {
    * @memberOf WebstratesEditor
    */
   public static SetClientStatus(status: string, countdownTime: number = 0) {
-    WebstratesEditor.ClientStatusBarItem.text = status;
+    const item = WebstratesEditor.ClientStatusBarItem;
 
-    const countdown = (seconds: Number) => {
-      if (countdownTime > 0) {
-        setTimeout(() => {
-          WebstratesEditor.ClientStatusBarItem.text = `${status}... ${countdownTime}`;
-          countdown(--countdownTime);
-        }, 1000);
-      }
+    // Stop any running timer.
+    if (WebstratesEditor.timer) {
+      WebstratesEditor.timer.dispose();
+      WebstratesEditor.timer = undefined;
     }
-    countdown(countdownTime);
+
+    const timer = WebstratesEditor.timer = new Timer(countdownTime);
+    timer.onElapsed(() => {
+      item.text = status;
+    });
+
+    if (countdownTime > 0) {
+      timer.onTick(({duration}) => {
+        item.text = `${status}... ${duration / 1000}s`;
+      });
+    }
+
+    timer.start();
   }
 
-  private static spinTimeoutHandle: any;
+  public static SetStatus(status: string, spinTimeout: number = 0, tooltip: string = null, color: string = null) {
+    const item = WebstratesEditor.StatusBarItem;
 
-  /**
-   * @param  {string} status
-   */
-  public static SetStatus(status: string, spinTimeout: Number = 0, tooltip: string = null, color: string = null) {
-
-    if (WebstratesEditor.statusBarSpinnerInterval) {
-      clearInterval(WebstratesEditor.statusBarSpinnerInterval);
-      WebstratesEditor.statusBarSpinnerInterval = undefined;
+    // Stop any running timer.
+    if (WebstratesEditor.spinnerTimer) {
+      WebstratesEditor.spinnerTimer.dispose();
+      WebstratesEditor.spinnerTimer = undefined;
     }
 
-    if (WebstratesEditor.spinTimeoutHandle) {
-      clearTimeout(WebstratesEditor.spinTimeoutHandle);
-      WebstratesEditor.spinTimeoutHandle = undefined;
-    }
+    const spinnerTimer = WebstratesEditor.spinnerTimer = new Timer(spinTimeout, 100);
 
-    if (spinTimeout > 0) {
-      WebstratesEditor.spinTimeoutHandle = setTimeout(() => {
-        WebstratesEditor.spinTimeoutHandle = undefined;
+    spinnerTimer.onTick(() => {
+      item.text = `${frame()} ${status}`;
+    });
 
-        clearInterval(WebstratesEditor.statusBarSpinnerInterval);
-        WebstratesEditor.statusBarSpinnerInterval = undefined;
+    spinnerTimer.onElapsed(() => {
+      item.text = status;
+    });
 
-        WebstratesEditor.StatusBarItem.text = status;
-      }, spinTimeout);
-    }
+    spinnerTimer.start();
 
-    WebstratesEditor.statusBarSpinnerInterval = setInterval(function () {
-      let spinnerFrame = frame();
-      WebstratesEditor.StatusBarItem.text = `${spinnerFrame} ${status}`;
-    }, 100);
+    // if (tooltip) {
+    //   WebstratesEditor.StatusBarItem.tooltip = tooltip;
+    // }
 
-    if (tooltip) {
-      WebstratesEditor.StatusBarItem.tooltip = tooltip;
-    }
-
-    if (color) {
-      WebstratesEditor.StatusBarItem.color = color;
-    }
+    // if (color) {
+    //   WebstratesEditor.StatusBarItem.color = color;
+    // }
   }
 
   /**

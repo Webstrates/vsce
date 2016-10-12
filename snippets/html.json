@@ -1,0 +1,20 @@
+{
+	"wbootstrap": {
+		"prefix": "wboostrap",
+		"body": "<!-- Webstrates External Script/Stylesheet Bootstrap -->\n<script type=\"text/javascript\" src=\"https://rawgit.com/Webstrates/common-libs/dev/build/external-webstrates.js\"></script>",
+		"description": "Webstrates External Script/Stylesheet Bootstrap",
+		"scope": "webstrates"
+	},
+	"wscript": {
+		"prefix": "wscript",
+		"body": "<wscript type=\"webstrate/javascript\" src=\"/$1\"></wscript>$0",
+		"description": "Webstrates External Script",
+		"scope": "webstrates"
+	},
+	"wlink": {
+		"prefix": "wlink",
+		"body": "<wlink type=\"webstrate/css\" src=\"/$1\"></wlink>$0",
+		"description": "Webstrates External Stylesheet",
+		"scope": "webstrates"
+	}
+}

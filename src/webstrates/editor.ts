@@ -24,6 +24,14 @@ export default class WebstratesEditor {
   private client: WebstratesClient;
   private previewUri: vscode.Uri;
 
+  private toggleStatusBarItem: vscode.StatusBarItem;
+  private toggleWidState: boolean = false;
+  // create a decorator type that we use to decorate large numbers
+  private widDecorationType = vscode.window.createTextEditorDecorationType({
+    color: 'rgba(0,0,0,0)',
+    letterSpacing: '-50px',
+  });
+
   // Reconnect to server timer.
   private reconnectTimer: Timer;
 
@@ -52,8 +60,42 @@ export default class WebstratesEditor {
     this.initPreview();
     this.initOutput();
 
+    this.initDecorators(context);
+    this.toggleStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+    this.toggleStatusBarItem.command = "webstrates.toggleWid";
+    this.toggleStatusBarItem.text = `Hide __wid ${this.toggleWidState ? "Enabled" : "Disabled"}`;
+    this.toggleStatusBarItem.color = this.toggleWidState ? "white" : "orange";
+    this.toggleStatusBarItem.show();
+
     // Show a 3 seconds status message that Webstrates editor has sucessfully loaded.
     vscode.window.setStatusBarMessage("Webstrates Editor successfully loaded.", 3000);
+  }
+
+  private initDecorators(context) {
+
+    var timeout = null;
+    let triggerUpdateDecorations = (activeEditor) => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      timeout = setTimeout(() => this.updateDecorations(activeEditor), 500);
+    }
+
+    let activeEditor;
+    vscode.window.onDidChangeActiveTextEditor(editor => {
+      activeEditor = editor;
+      if (editor) {
+        triggerUpdateDecorations(activeEditor);
+      }
+    }, null, context.subscriptions);
+
+    vscode.workspace.onDidChangeTextDocument(event => {
+      if (activeEditor && event.document === activeEditor.document) {
+        triggerUpdateDecorations(activeEditor);
+      }
+    }, null, context.subscriptions);
+
+    this.updateVisibleTextEditors();
   }
 
   /**
@@ -119,9 +161,10 @@ export default class WebstratesEditor {
    */
   private initCommands() {
     const initWorkspaceDisposable = vscode.commands.registerCommand('webstrates.initWorkspace', () => Utils.initWorkspace());
+    const toggleWidDisposable = vscode.commands.registerCommand('webstrates.toggleWid', () => this.toggleWid());
     const webstratePreviewDisposable = vscode.commands.registerCommand('webstrates.webstratePreview', () => this.webstratePreview());
 
-    this.context.subscriptions.push(initWorkspaceDisposable, webstratePreviewDisposable);
+    this.context.subscriptions.push(initWorkspaceDisposable, toggleWidDisposable, webstratePreviewDisposable);
   }
 
   /**
@@ -193,6 +236,64 @@ export default class WebstratesEditor {
     // Show 'Webstrates' status bar item in UI.
     WebstratesEditor.StatusBarItem.show();
     WebstratesEditor.ClientStatusBarItem.show();
+  }
+
+  /**
+   * 
+   * 
+   * @private
+   * 
+   * @memberOf WebstratesEditor
+   */
+  private toggleWid() {
+    this.toggleWidState = !this.toggleWidState;
+    this.toggleStatusBarItem.text = `Hide __wid ${this.toggleWidState ? "Enabled" : "Disabled"}`;
+    this.toggleStatusBarItem.color = this.toggleWidState ? "white" : "orange";
+
+    this.updateVisibleTextEditors();
+  }
+
+  /**
+   * 
+   * 
+   * @private
+   * @param {vscode.TextEditor} textEditor
+   * 
+   * @memberOf WebstratesEditor
+   */
+  private updateVisibleTextEditors() {
+
+    vscode.window.visibleTextEditors.forEach((textEditor: vscode.TextEditor) => {
+      this.updateDecorations(textEditor);
+    });
+  }
+
+  /**
+   * 
+   * 
+   * @private
+   * @param {vscode.TextEditor} textEditor
+   * 
+   * @memberOf WebstratesEditor
+   */
+  private updateDecorations(textEditor: vscode.TextEditor) {
+    if (this.toggleWidState) {
+      var regEx = / __wid="[\w- ]*"/g;
+      var text = textEditor.document.getText();
+      var largeNumbers: vscode.DecorationOptions[] = [];
+      var match;
+      while (match = regEx.exec(text)) {
+        var startPos = textEditor.document.positionAt(match.index);
+        var endPos = textEditor.document.positionAt(match.index + match[0].length);
+        var decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: match[0] };
+        largeNumbers.push(decoration);
+      }
+
+      textEditor.setDecorations(this.widDecorationType, largeNumbers);
+    }
+    else {
+      textEditor.setDecorations(this.widDecorationType, []);
+    }
   }
 
   private onFileDocumentConnect: any;

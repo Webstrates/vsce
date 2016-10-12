@@ -3,7 +3,7 @@
     "displayName": "Webstrates Editor",
     "description": "Editor that connects to Webstrates server to edit webstrates within Visual Studio Code.",
     "icon": "images/webstrates-logo.png",
-    "version": "0.7.1",
+    "version": "0.7.2",
     "publisher": "raedle",
     "license": "Apache-2.0",
     "bugs": {
@@ -33,6 +33,10 @@
                 "title": "Init Webstrates Workspace"
             },
             {
+                "command": "webstrates.toggleWid",
+                "title": "Webstrate Toggle __wid"
+            },
+            {
                 "command": "webstrates.webstratePreview",
                 "title": "Webstrate Preview"
             }
@@ -60,6 +64,12 @@
                 "extensions": [
                     ".css"
                 ]
+            }
+        ],
+        "snippets": [
+            {
+                "language": "html",
+                "path": "./snippets/html.json"
             }
         ]
     },

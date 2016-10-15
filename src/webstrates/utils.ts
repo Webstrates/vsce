@@ -3,6 +3,7 @@ const path = require('path');
 const JSONC = require('json-comments');
 
 import * as vscode from 'vscode';
+import PathUtils from '../utils/path-utils';
 
 const initialConfiguration = `{
     // DNS or IP address to connect to Webstrates server.
@@ -108,6 +109,13 @@ const Utils = {
     // since it could also be a webstrateId or it could be a subfolder.
     // Ignore if it is the .webstrates configuration folder.
     if (document.fileName.lastIndexOf('.webstrates') > -1) {
+      return null;
+    }
+
+    // Check if text document if part (not part) of workspace. For example, user workspace settings.json
+    // will not result in loading it as a webstrate.
+    const rootPath = vscode.workspace.rootPath;
+    if (!PathUtils.isInHierarchy(rootPath, document.fileName)) {
       return null;
     }
 

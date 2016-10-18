@@ -1,98 +1,101 @@
 {
-    "name": "webstrates-editor",
-    "displayName": "Webstrates Editor",
-    "description": "An editor extension that connects to Webstrates server to edit webstrates within Visual Studio Code.",
-    "icon": "images/webstrates-logo.png",
-    "version": "0.7.3",
-    "publisher": "raedle",
-    "license": "Apache-2.0",
-    "bugs": {
-        "url": "https://github.com/Webstrates/vsce/issues",
-        "email": "roman.raedle@gmail.com"
-    },
-    "homepage": "https://github.com/Webstrates/vsce/blob/master/README.md",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/Webstrates/vsce.git"
-    },
-    "categories": [
-        "Other"
+  "name": "webstrates-editor",
+  "displayName": "Webstrates Editor",
+  "description": "An editor extension that connects to Webstrates server to edit webstrates within Visual Studio Code.",
+  "icon": "images/webstrates-logo.png",
+  "version": "0.7.3",
+  "publisher": "raedle",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Webstrates/vsce/issues",
+    "email": "roman.raedle@gmail.com"
+  },
+  "homepage": "https://github.com/Webstrates/vsce/blob/master/README.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Webstrates/vsce.git"
+  },
+  "categories": [
+    "Other"
+  ],
+  "engines": {
+    "vscode": "^1.5.0"
+  },
+  "main": "./out/src/extension",
+  "activationEvents": [
+    "workspaceContains:.webstrates/config.json",
+    "onCommand:webstrates.initWorkspace"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "webstrates.initWorkspace",
+        "title": "Init Webstrates Workspace"
+      },
+      {
+        "command": "webstrates.toggleWid",
+        "title": "Webstrate Toggle __wid"
+      },
+      {
+        "command": "webstrates.webstratePreview",
+        "title": "Webstrate Preview"
+      }
     ],
-    "engines": {
-        "vscode": "^1.5.0"
-    },
-    "main": "./out/src/extension",
-    "activationEvents": [
-        "workspaceContains:.webstrates/config.json",
-        "onCommand:webstrates.initWorkspace"
+    "keybindings": [
+      {
+        "command": "webstrates.webstratePreview",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p"
+      }
     ],
-    "contributes": {
-        "commands": [
-            {
-                "command": "webstrates.initWorkspace",
-                "title": "Init Webstrates Workspace"
-            },
-            {
-                "command": "webstrates.toggleWid",
-                "title": "Webstrate Toggle __wid"
-            },
-            {
-                "command": "webstrates.webstratePreview",
-                "title": "Webstrate Preview"
-            }
-        ],
-        "keybindings": [
-            {
-                "command": "webstrates.webstratePreview",
-                "key": "ctrl+alt+p",
-                "mac": "cmd+alt+p"
-            }
-        ],
-        "languages": [
-            {
-                "id": "html",
-                "firstLine": ".*<html.*"
-            },
-            {
-                "id": "js",
-                "extensions": [
-                    ".js"
-                ]
-            },
-            {
-                "id": "css",
-                "extensions": [
-                    ".css"
-                ]
-            }
-        ],
-        "snippets": [
-            {
-                "language": "html",
-                "path": "./snippets/html.json"
-            }
+    "languages": [
+      {
+        "id": "html",
+        "firstLine": ".*<html.*"
+      },
+      {
+        "id": "js",
+        "extensions": [
+          ".js"
         ]
-    },
-    "scripts": {
-        "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
-        "compile": "node ./node_modules/vscode/bin/compile -watch -p ./",
-        "postinstall": "node ./node_modules/vscode/bin/install",
-        "test": "node ./node_modules/vscode/bin/test"
-    },
-    "dependencies": {
-        "cheerio": "^0.20.0",
-        "chokidar": "^1.6.0",
-        "elegant-spinner": "^1.0.1",
-        "event-emitter": "^0.3.4",
-        "json-comments": "^0.2.1",
-        "moment": "^2.15.1",
-        "optimist": "^0.6.1",
-        "websocket": "^1.0.23",
-        "webstrates": "^0.2.3"
-    },
-    "devDependencies": {
-        "eslint": "^3.7.1",
-        "typescript": "^1.8.5",
-        "vscode": "^0.11.0"
-    }
+      },
+      {
+        "id": "css",
+        "extensions": [
+          ".css"
+        ]
+      }
+    ],
+    "snippets": [
+      {
+        "language": "html",
+        "path": "./snippets/html.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
+    "compile": "node ./node_modules/vscode/bin/compile -watch -p ./",
+    "postinstall": "node ./node_modules/vscode/bin/install",
+    "test": "node ./node_modules/vscode/bin/test",
+    "preversion": "npm test",
+    "version": "git add -A",
+    "postversion": "git push && git push --tags && vsce publish $npm_package_version"
+  },
+  "dependencies": {
+    "cheerio": "^0.20.0",
+    "chokidar": "^1.6.0",
+    "elegant-spinner": "^1.0.1",
+    "event-emitter": "^0.3.4",
+    "json-comments": "^0.2.1",
+    "moment": "^2.15.1",
+    "optimist": "^0.6.1",
+    "websocket": "^1.0.23",
+    "webstrates": "^0.2.3"
+  },
+  "devDependencies": {
+    "eslint": "^3.7.1",
+    "typescript": "^1.8.5",
+    "vscode": "^0.11.0"
+  }
 }

@@ -13,7 +13,13 @@ const initialConfiguration = `{
 
     "reconnectTimeout": 10000,
 
-    "deleteLocalFilesOnClose": false
+    "deleteLocalFilesOnClose": false,
+
+    "ignorePaths": [
+        ".vscode",
+        ".webstrates",
+        ".gitignore"
+    ]
 
     // In future, further configuration options will be added to this
     // config.json. For example, authentication user/password, connection
@@ -55,7 +61,17 @@ const Utils = {
     }
 
     let rawConfig = fs.readFileSync(webstratesConfigFileAbsolute, 'utf8');
-    return JSONC.parse(rawConfig);
+    const config = JSONC.parse(rawConfig);
+
+    if (!config.ignorePaths) {
+      config.ignorePaths = [];
+    }
+
+    if (config.ignorePaths.indexOf(".webstrates") < 0) {
+      config.ignorePaths.push(".webstrates");
+    }
+
+    return config;
   },
 
   /**
@@ -104,21 +120,42 @@ const Utils = {
     return webstratesConfigFileAbsolute;
   },
 
-  getWebstrateIdFromDocument(document: vscode.TextDocument) {
-    // Quick check for .webstrates configuration folder in workspace. This is not optimal
-    // since it could also be a webstrateId or it could be a subfolder.
-    // Ignore if it is the .webstrates configuration folder.
-    if (document.fileName.lastIndexOf('.webstrates') > -1) {
-      return null;
+  isIgnorePath(document: vscode.TextDocument) {
+    const config = Utils.loadWorkspaceConfig();
+
+    let relativeDocumentPath = vscode.workspace.asRelativePath(document.uri);
+
+    relativeDocumentPath = path.normalize(relativeDocumentPath);
+
+    if (config.ignorePaths && Array.isArray(config.ignorePaths)) {
+      const { ignorePaths } = config;
+      const len = ignorePaths.length;
+      for (let i = 0; i < len; i++) {
+        const ignorePath = path.normalize(ignorePaths[i]);
+
+        // Check if file paths match.
+        if (relativeDocumentPath === ignorePath) {
+          return true;
+        }
+
+        // Check if document is part of ignore path hierarchy.
+        if (PathUtils.isInHierarchy(ignorePath, relativeDocumentPath)) {
+          return true;
+        }
+      }
     }
 
     // Check if text document if part (not part) of workspace. For example, user workspace settings.json
     // will not result in loading it as a webstrate.
     const rootPath = vscode.workspace.rootPath;
     if (!PathUtils.isInHierarchy(rootPath, document.fileName)) {
-      return null;
+      return true;
     }
 
+    return false;
+  },
+
+  getWebstrateIdFromDocument(document: vscode.TextDocument) {
     return path.posix.basename(document.fileName);
   }
 }

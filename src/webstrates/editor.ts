@@ -315,7 +315,8 @@ export default class WebstratesEditor {
   private openDocumentWebstrate(textDocument: vscode.TextDocument) {
 
     // Ignore workspace config.
-    if (Utils.isWorkspaceConfig(textDocument)) {
+    if (Utils.isIgnorePath(textDocument)) {
+      WebstratesEditor.Log.debug(`Text document ${textDocument.fileName} is ignored due to set ignore path.`);
       return;
     }
 
@@ -429,7 +430,12 @@ export default class WebstratesEditor {
    * @memberOf WebstratesEditor
    */
   private closeWebstrate(textDocument: vscode.TextDocument) {
-    // vscode.window.showInformationMessage('close text doc');
+    
+    // Ignore workspace config.
+    if (Utils.isIgnorePath(textDocument)) {
+      WebstratesEditor.Log.debug(`Text document ${textDocument.fileName} is ignored due to set ignore path.`);
+      return;
+    }
 
     const config = Utils.loadWorkspaceConfig();
     // const deleteLocalFile = typeof config.deleteLocalFilesOnClose === "undefined" ? true : config.deleteLocalFilesOnClose;
@@ -464,6 +470,12 @@ export default class WebstratesEditor {
       this.connectToServer();
     }
     else {
+      // Ignore workspace config.
+      if (Utils.isIgnorePath(textDocument)) {
+        WebstratesEditor.Log.debug(`Text document ${textDocument.fileName} is ignored due to set ignore path.`);
+        return;
+      }
+    
       this.client.saveWebstrate(textDocument);
     }
   }

@@ -126,7 +126,7 @@ export default class FileDocument {
 
       timeout = setTimeout(() => {
         this.writeToFile(html);
-      }, 500);
+      }, 2500);
     });
 
     document.onUpdate(html => {

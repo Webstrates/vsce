@@ -61,14 +61,14 @@ export default class WebstratesClient {
     let fileDocument = this.documentsToWebstrates.get(textDocument);
 
     if (!fileDocument) {
-      let webstrateId = Utils.getWebstrateIdFromDocument(textDocument);
+      const metadata = Utils.getWebstrateMetadataFromDocument(textDocument);
 
-      if (!webstrateId) {
+      if (!metadata.webstrateId) {
         WebstratesClient.Log.debug(`Could not resolve webstrate id from text document ${textDocument.fileName}.`);
         return null;
       }
 
-      fileDocument = this.requestWebstrate(webstrateId, textDocument);
+      fileDocument = this.requestWebstrate(metadata, textDocument);
       this.documentsToWebstrates.add(textDocument, fileDocument);
     }
 
@@ -102,12 +102,12 @@ export default class WebstratesClient {
   /**
    * Open a webstrate as file and using the client to connect to the Webstrates server.
    * 
-   * @param  {String} webstrateId Webstrate document id.
+   * @param  {any} metadata Webstrate metadata, webstrate id and content id.
    * @param  {string} filePath Path to file to store webstrate document content.
    */
-  private openDocumentAsFile(webstrateId: String, textDocument: vscode.TextDocument) {
-    const document = this.client.openDocument(webstrateId, false);
-    return new FileDocument(document, textDocument);
+  private openDocumentAsFile(metadata: any, textDocument: vscode.TextDocument) {
+    const document = this.client.openDocument(metadata.webstrateId, false);
+    return new FileDocument(metadata, document, textDocument);
   }
 
   /**
@@ -142,25 +142,25 @@ export default class WebstratesClient {
    * 
    * 
    * @private
-   * @param {String} webstrateId
+   * @param {Array} metadata
    * @param {vscode.TextDocument} textDocument
    * @returns {Thenable<FileDocument>}
    * 
    * @memberOf WebstratesClient
    */
-  private requestWebstrate(webstrateId: String, textDocument: vscode.TextDocument): FileDocument {
+  private requestWebstrate(metadata: any, textDocument: vscode.TextDocument): FileDocument {
 
-    WebstratesClient.Log.debug(`Requesting webstrate ${webstrateId} and saving to ${textDocument.fileName}`);
+    WebstratesClient.Log.debug(`Requesting webstrate ${metadata.webstrateId} and saving to ${textDocument.fileName}`);
 
     // add WebstrateFile to currently open files
     // this is required to close connection workspace.onDidCloseTextDocument
-    const fileDocument = this.openDocumentAsFile(webstrateId, textDocument);
+    const fileDocument = this.openDocumentAsFile(metadata, textDocument);
     fileDocument.onDidConnect(() => {
-      WebstratesClient.Log.debug(`Loaded webstrate '${webstrateId}'`);
+      WebstratesClient.Log.debug(`Loaded webstrate '${metadata.webstrateId}'`);
     });
 
     fileDocument.onDidDisconnect(() => {
-      WebstratesClient.Log.debug(`Disconnected from webstrate '${webstrateId}'`);
+      WebstratesClient.Log.debug(`Disconnected from webstrate '${metadata.webstrateId}'`);
     });
     fileDocument.connect();
 

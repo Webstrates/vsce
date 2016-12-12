@@ -4,12 +4,14 @@ const cheerio = require("cheerio");
 import * as vscode from 'vscode';
 
 import Logger from '../utils/logger';
+import { Utils } from './utils';
 
 export default class FileDocument {
 
   // Logger to log info, debug, error, and warn messages.
   private static Log: Logger = Logger.getLogger(FileDocument);
 
+  private metadata: any;
   private document: any;
   private textDocument: vscode.TextDocument;
   private oldHtml: String;
@@ -18,7 +20,17 @@ export default class FileDocument {
   // File connected to webstrate document
   public isConnected: Boolean = false;
 
-  constructor(document: any, textDocument: vscode.TextDocument) {
+  /**
+   * Creates an instance of FileDocument.
+   * 
+   * @param {*} metadata Webstrate metadata, webstrate id and content id.
+   * @param {*} document
+   * @param {vscode.TextDocument} textDocument
+   * 
+   * @memberOf FileDocument
+   */
+  constructor(metadata: any, document: any, textDocument: vscode.TextDocument) {
+    this.metadata = metadata;
     this.document = document;
     this.textDocument = textDocument;
 
@@ -71,19 +83,19 @@ export default class FileDocument {
 
     this.oldHtml = newHtml;
     // Replace script or style and receive back valid html document.
-    if (this.$) {
-      var $webstrateContent = this.$('#webstrate');
+    if (this.metadata.contentId) {
+      var $webstrateContent = this.$(`#${this.metadata.contentId}`);
       // Create container if it does not exist.
       if (!$webstrateContent.length) {
         $webstrateContent = this.$('<pre />');
-        $webstrateContent.attr('id', 'webstrate');
+        $webstrateContent.attr('id', this.metadata.contentId);
         this.$('body').append($webstrateContent);
       }
       $webstrateContent.text(newHtml);
       newHtml = this.$.html();
     }
 
-    this.document.update(newHtml, !(this.id.endsWith(".js") || this.id.endsWith(".css")));
+    this.document.update(newHtml, !this.metadata.contentId);
   }
 
   close(deleteLocalFile: boolean = true) {
@@ -135,10 +147,10 @@ export default class FileDocument {
   }
 
   private writeToFile(html) {
-    // Load content of #webstrate element if webstrate id ends with .js or .css
-    if (this.id.endsWith(".js") || this.id.endsWith(".css")) {
+    // Load content of #contentId element if webstrate id contains a # character
+    if (this.metadata.contentId) {
       this.$ = cheerio.load(html);
-      var $webstrateContent = this.$('#webstrate');
+      const $webstrateContent = this.$(`#${this.metadata.contentId}`);
       html = $webstrateContent.length ? $webstrateContent.text() : "";
     }
     this.oldHtml = html;

@@ -155,8 +155,28 @@ const Utils = {
     return false;
   },
 
-  getWebstrateIdFromDocument(document: vscode.TextDocument) {
-    return path.posix.basename(document.fileName);
+  getWebstrateMetadataFromDocument(document: vscode.TextDocument) {
+    const data = path.posix.basename(document.fileName);
+    
+    const splitData = data.split('#');
+    const webstrateId = splitData[0];
+
+    let contentId = null;
+    if (splitData.length > 1) {
+      const contentData = splitData[1];
+      
+      if (contentData.lastIndexOf('.') > -1) {
+        contentId = contentData.substr(0, contentData.lastIndexOf('.'));
+      }
+      else {
+        contentId = contentData;
+      }
+    }
+
+    return {
+      webstrateId: splitData[0],
+      contentId: contentId
+    };
   }
 }
 

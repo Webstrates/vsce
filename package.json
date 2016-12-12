@@ -54,15 +54,15 @@
         "firstLine": ".*<html.*"
       },
       {
-        "id": "js",
+        "id": "JavaScript",
         "extensions": [
-          ".js"
+          "#js"
         ]
       },
       {
         "id": "css",
         "extensions": [
-          ".css"
+          "#css"
         ]
       }
     ],

@@ -156,7 +156,11 @@ const Utils = {
   },
 
   getWebstrateMetadataFromDocument(document: vscode.TextDocument) {
-    const data = path.posix.basename(document.fileName);
+
+    // Fixes #5
+    // path.posix.basename only works on Mac OS and not on Windows as reported in Node.js documentation
+    // On POSIX and Windows https://nodejs.org/api/path.html#path_path_posix
+    const data = path.basename(document.fileName);
     
     const splitData = data.split('#');
     const webstrateId = splitData[0];

@@ -315,7 +315,7 @@ export default class WebstratesEditor {
   private openDocumentWebstrate(textDocument: vscode.TextDocument) {
 
     // Ignore workspace config.
-    if (Utils.isIgnorePath(textDocument)) {
+    if (Utils.isIgnoreDocument(textDocument)) {
       WebstratesEditor.Log.debug(`Text document ${textDocument.fileName} is ignored due to set ignore path.`);
       return;
     }
@@ -432,7 +432,7 @@ export default class WebstratesEditor {
   private closeWebstrate(textDocument: vscode.TextDocument) {
     
     // Ignore workspace config.
-    if (Utils.isIgnorePath(textDocument)) {
+    if (Utils.isIgnoreDocument(textDocument)) {
       WebstratesEditor.Log.debug(`Text document ${textDocument.fileName} is ignored due to set ignore path.`);
       return;
     }
@@ -471,7 +471,7 @@ export default class WebstratesEditor {
     }
     else {
       // Ignore workspace config.
-      if (Utils.isIgnorePath(textDocument)) {
+      if (Utils.isIgnoreDocument(textDocument)) {
         WebstratesEditor.Log.debug(`Text document ${textDocument.fileName} is ignored due to set ignore path.`);
         return;
       }

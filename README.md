@@ -6,6 +6,10 @@
 
 The Webstrates Editor allows synchronized editing of webstrates in Visual Studio Code (vscode).
 
+## Release Notes
+
+This release fixes an issue with the extension creating an additional .git file for each webstrate that is opened.
+
 ---
 
 ## Working with Webstrates Editor

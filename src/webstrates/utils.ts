@@ -7,10 +7,9 @@ import PathUtils from '../utils/path-utils';
 
 const initialConfiguration = `{
     // DNS or IP address to connect to Webstrates server.
-    "serverAddress": "ws://webstrate.cs.au.dk",
+    "serverAddress": "ws://localhost:7007",
 
     "reconnect": true,
-
     "reconnectTimeout": 10000,
 
     "deleteLocalFilesOnClose": false,
@@ -19,6 +18,10 @@ const initialConfiguration = `{
         ".vscode",
         ".webstrates",
         ".gitignore"
+    ],
+
+    "ignoreFiles": [
+        "*.git"
     ]
 
     // In future, further configuration options will be added to this
@@ -120,7 +123,7 @@ const Utils = {
     return webstratesConfigFileAbsolute;
   },
 
-  isIgnorePath(document: vscode.TextDocument) {
+  isIgnoreDocument(document: vscode.TextDocument) {
     const config = Utils.loadWorkspaceConfig();
 
     let relativeDocumentPath = vscode.workspace.asRelativePath(document.uri);
@@ -150,6 +153,17 @@ const Utils = {
     const rootPath = vscode.workspace.rootPath;
     if (!PathUtils.isInHierarchy(rootPath, document.fileName)) {
       return true;
+    }
+
+    if (config.ignoreFiles && Array.isArray(config.ignoreFiles)) {
+
+      let ignore = config.ignoreFiles.some((ignoreFile) => {
+        return document.fileName.endsWith(ignoreFile);
+      });
+
+      if (ignore) {
+        return true;
+      }
     }
 
     return false;

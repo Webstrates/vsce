@@ -4,6 +4,11 @@
   "description": "An editor extension that connects to Webstrates server to edit webstrates within Visual Studio Code.",
   "icon": "images/webstrates-logo.png",
   "version": "0.10.0",
+  "author": {
+    "name": "Roman Rädle",
+    "email": "contact@romanraedle.com",
+    "url": "https://romanraedle.com"
+  },
   "publisher": "raedle",
   "license": "Apache-2.0",
   "homepage": "https://github.com/Webstrates/vsce/blob/master/README.md",

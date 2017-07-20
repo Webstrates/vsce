@@ -96,7 +96,7 @@
     "moment": "^2.15.1",
     "optimist": "^0.6.1",
     "websocket": "^1.0.23",
-    "webstrates": "^0.2.7"
+    "webstrates": "^0.2.8"
   },
   "devDependencies": {
     "@types/mocha": "^2.2.32",
